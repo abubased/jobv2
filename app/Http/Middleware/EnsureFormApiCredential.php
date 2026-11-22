@@ -18,6 +18,13 @@ class EnsureFormApiCredential
             return $next($request);
         }
 
+        $requestOrigin = rtrim($origin, '/');
+        $sameHost = rtrim($request->getSchemeAndHttpHost(), '/');
+
+        if (strcasecmp($requestOrigin, $sameHost) === 0) {
+            return $next($request);
+        }
+
         $allowedOrigins = array_values(array_filter((array) config('cors.allowed_origins', [])));
 
         if (! in_array(rtrim($origin, '/'), array_map(static fn (string $allowed): string => rtrim($allowed, '/'), $allowedOrigins), true)) {

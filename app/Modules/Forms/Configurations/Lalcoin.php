@@ -7,6 +7,7 @@ return [
     'enabled' => true,
     'reference_prefix' => 'LAL',
     'merchant_name' => 'লাল কয়েন',
+    'required_fields' => true,
     'frontend' => [
         'type' => 'external',
         'url' => '/lalcoin',

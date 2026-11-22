@@ -162,18 +162,20 @@ const submitForm = async () => {
      * coin_year
      */
     const formData = {
+        form_slug: 'lalcoin',
         name: form.value.name,
         address: form.value.address,
         phone: form.value.phone,
-        coin_count: form.value.coinCount,
-        coin_year: form.value.coinYear,
-        submitted: true,
+        form_data: {
+            coin_count: form.value.coinCount,
+            coin_year: form.value.coinYear,
+        },
     };
 
     const csrfToken = getCsrfToken();
 
     try {
-        const response = await fetch('/lalcoin/applications', {
+        const response = await fetch('/submit-form', {
             method: 'POST',
             credentials: 'same-origin',
             headers: {
@@ -187,20 +189,27 @@ const submitForm = async () => {
 
         const result = await response.json();
 
-        if (!response.ok) {
+        if (!response.ok || !result.success) {
             const serverErrors = result.errors || {};
+            const mappedErrors: Record<string, string> = {};
 
-            errors.value = serverErrors;
+            Object.entries(serverErrors).forEach(([key, value]) => {
+                const message = Array.isArray(value) ? String(value[0]) : String(value);
+                const field = key.replace(/^form_data\./, '');
 
-            const phoneError = serverErrors.phone;
+                if (field === 'coin_count') {
+                    mappedErrors.coinCount = message;
+                } else if (field === 'coin_year') {
+                    mappedErrors.coinYear = message;
+                } else {
+                    mappedErrors[key] = message;
+                }
+            });
 
-            if (
-                phoneError &&
-                String(phoneError).includes('আগেই ফরম পূরন হয়েছে')
-            ) {
-                duplicatePhoneMessage.value = phoneError;
-                showRegistrationModal.value = false;
-                showDuplicatePhoneModal.value = true;
+            errors.value = mappedErrors;
+
+            if (Object.keys(mappedErrors).length > 0) {
+                scrollToFirstError();
             } else {
                 alert(
                     result.message ||
@@ -211,8 +220,12 @@ const submitForm = async () => {
             return;
         }
 
-        currentApplicationId.value =
-            result.application?.id ?? null;
+        currentApplicationId.value = result.application_id ?? null;
+
+        if (!currentApplicationId.value) {
+            alert(result.message || 'আবেদন জমা হয়েছে, কিন্তু পেমেন্ট শুরু করা যায়নি।');
+            return;
+        }
 
         showRegistrationModal.value = false;
 
@@ -245,30 +258,27 @@ const openPaymentFrame = async () => {
     try {
         const csrfToken = getCsrfToken();
 
-        const response = await fetch(
-            '/lalcoin/applications/init-payment',
-            {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Accept: 'application/json',
-                    'X-CSRF-TOKEN': csrfToken,
-                    'X-XSRF-TOKEN': csrfToken,
-                },
-                body: JSON.stringify({
-                    application_id: currentApplicationId.value,
-                    method: selectedPaymentMethod.value,
-                }),
-            }
-        );
+        const response = await fetch('/init-payment', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+                'X-XSRF-TOKEN': csrfToken,
+            },
+            body: JSON.stringify({
+                application_id: currentApplicationId.value,
+                method: selectedPaymentMethod.value,
+            }),
+        });
 
         const result = await response.json();
 
-        if (!response.ok || !result.success) {
+        if (!response.ok || !result.success || !result.url || result.payment_status === 'paid') {
             alert(
                 result.message ||
-                    'পেমেন্ট শুরু করতে সমস্যা হয়েছে।'
+                    'পেমেন্ট এখনো নিশ্চিত হয়নি। আবেদন জমা আছে।'
             );
 
             return;
@@ -937,6 +947,9 @@ onBeforeUnmount(() => {
                         >
                             পেমেন্ট পদ্ধতি নির্বাচন করুন
                         </h3>
+                        <p class="mt-1 text-xs text-gray-500">
+                            আবেদন জমা হয়েছে। ফি ৯৯.০০ টাকা। পেমেন্ট এখনো নিশ্চিত হয়নি।
+                        </p>
                     </div>
 
                     <button
