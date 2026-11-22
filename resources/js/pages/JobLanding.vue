@@ -208,21 +208,23 @@ const submitFormDirect = async () => {
     isSubmittingApplication.value = true;
 
     const formData = {
+        form_slug: 'job-application',
         name: form.value.name,
-        father_or_husband: form.value.fatherOrHusband,
-        mother: form.value.mother,
         phone: form.value.phone,
         address: form.value.address,
-        education: form.value.education,
-        courier_help: form.value.courierHelp,
-        nearest_courier: normalizeRegistrationFee(form.value.nearestCourier),
-        submitted: true,
+        form_data: {
+            father_or_husband: form.value.fatherOrHusband,
+            mother: form.value.mother,
+            education: form.value.education,
+            courier_help: form.value.courierHelp,
+            nearest_courier: form.value.nearestCourier,
+        },
     };
 
     const csrfToken = getCsrfToken();
 
     try {
-        const response = await fetch('/job-applications', {
+        const response = await fetch('/submit-form', {
             method: 'POST',
             credentials: 'same-origin',
             headers: {
@@ -236,10 +238,16 @@ const submitFormDirect = async () => {
 
         const result = await response.json();
 
-        if (!response.ok) {
+        if (!response.ok || !result.success) {
             const serverErrors = result.errors || {};
+            const mappedErrors: Record<string, string> = {};
 
-            errors.value = serverErrors;
+            Object.entries(serverErrors).forEach(([key, value]) => {
+                const message = Array.isArray(value) ? String(value[0]) : String(value);
+                mappedErrors[key.replace(/^form_data\./, '')] = message;
+            });
+
+            errors.value = mappedErrors;
 
             const phoneError = serverErrors.phone;
 
@@ -262,8 +270,12 @@ const submitFormDirect = async () => {
         }
 
         // Application successfully created
-        currentApplicationId.value =
-            result.application?.id ?? null;
+        currentApplicationId.value = result.application_id ?? null;
+
+        if (!currentApplicationId.value) {
+            alert(result.message || 'আবেদন জমা হয়েছে, কিন্তু পেমেন্ট শুরু করা যায়নি।');
+            return;
+        }
 
         showRegistrationModal.value = false;
 
@@ -338,7 +350,7 @@ const openPaymentFrame = async () => {
 
         const csrfToken = getCsrfToken();
 
-        const response = await fetch('/job-applications/init-payment', {
+        const response = await fetch('/init-payment', {
             method: 'POST',
             credentials: 'same-origin',
             headers: {
@@ -355,10 +367,10 @@ const openPaymentFrame = async () => {
 
         const result = await response.json();
 
-        if (!response.ok || !result.success) {
+        if (!response.ok || !result.success || !result.url || result.payment_status === 'paid') {
             alert(
                 result.message ||
-                'পেমেন্ট শুরু করতে সমস্যা হয়েছে।'
+                'পেমেন্ট এখনো নিশ্চিত হয়নি। আবেদন জমা আছে। ফি ২০.০০ টাকা।'
             );
             return;
         }

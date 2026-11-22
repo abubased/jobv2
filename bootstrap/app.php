@@ -27,6 +27,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             'lalcoin/applications',
             'lalcoin/applications/init-payment',
+            'submit-form',
+            'init-payment',
         ]);
 
         $middleware->alias([

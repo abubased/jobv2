@@ -15,7 +15,8 @@ return [
     'description' => 'সহজ ক্যাশ ঋণ আবেদন। আবেদন ফি ঋণের পরিমাণ নয়।',
     'enabled' => true,
     'reference_prefix' => 'LOAN',
-    'merchant_name' => config('shohojcash.merchant_name'),
+    'merchant_name' => 'সহজ ক্যাশ',
+    'required_fields' => true,
     'frontend' => [
         'type' => 'local',
         'directory' => 'shohojcash',
@@ -100,8 +101,8 @@ return [
             'name' => 'road',
             'label' => 'রাস্তা / গ্রাম / এলাকা',
             'type' => 'text',
-            'required' => true,
-            'validation' => ['required', 'string', 'max:255'],
+            'required' => false,
+            'validation' => ['nullable', 'string', 'max:255'],
             'help_text' => 'নাম, ফোন এবং এই ঠিকানার অংশগুলো মিলে আবেদনের ঠিকানা হয়।',
             'section' => 'ঠিকানা',
             'order' => 80,
@@ -170,10 +171,9 @@ return [
         'name' => ['required', 'string', 'max:100'],
         'phone' => ['required', 'string', 'regex:/^01[3-9]\d{8}$/'],
     ],
-    'payment_amount' => config('shohojcash.payment_amount'),
+    'payment_amount' => '20.00',
     'payment_amount_source' => [
-        'type' => 'config',
-        'key' => 'shohojcash.payment_amount',
+        'type' => 'fixed',
     ],
     'accepted_payment_methods' => ['nagad', 'bkash', 'rocket', 'upay'],
     'merchant_notification_emails' => [

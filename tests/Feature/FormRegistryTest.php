@@ -143,24 +143,8 @@ final class FormRegistryTest extends TestCase
         Notification::assertSentOnDemand(ApplicationSubmittedNotification::class);
     }
 
-    public function test_job_fee_must_match_the_server_allow_list(): void
+    public function test_job_fee_is_fixed_and_ignores_nearest_courier(): void
     {
-        $rejected = $this->postJson('/submit-form', [
-            'slug' => 'job-application',
-            'name' => 'Karim',
-            'phone' => '01711111111',
-            'address' => 'Dhaka',
-            'form_data' => [
-                'education' => 'bachelor',
-                'courier_help' => 'yes',
-                'nearest_courier' => '99',
-            ],
-        ]);
-
-        $rejected->assertStatus(422);
-        $this->assertSame(0, Application::query()->count());
-        $this->assertSame(0, JobApplication::query()->count());
-
         $accepted = $this->postJson('/submit-form', [
             'slug' => 'job-application',
             'name' => 'Karim',
@@ -172,7 +156,7 @@ final class FormRegistryTest extends TestCase
                 'mother' => 'Mother Name',
                 'education' => 'bachelor',
                 'courier_help' => 'yes',
-                'nearest_courier' => '20',
+                'nearest_courier' => '99',
             ],
         ]);
 
@@ -181,6 +165,7 @@ final class FormRegistryTest extends TestCase
 
         $application = Application::query()->firstOrFail();
         $this->assertSame('20.00', $application->payment_amount);
+        $this->assertSame('99', $application->form_data['nearest_courier']);
         $this->assertSame(config('app.name'), $application->merchant_name);
         $this->assertStringStartsWith('JOB-', (string) $application->payment_reference);
         $this->assertSame($application->payment_reference, $accepted->json('reference_no'));
@@ -226,7 +211,7 @@ final class FormRegistryTest extends TestCase
         $application = Application::query()->firstOrFail();
         $this->assertSame('Road 10, Uttara, Dhaka, ঢাকা', $application->address);
         $this->assertSame('20.00', $application->payment_amount);
-        $this->assertSame(config('shohojcash.merchant_name'), $application->merchant_name);
+        $this->assertSame('সহজ ক্যাশ', $application->merchant_name);
         $this->assertStringStartsWith('LOAN-', (string) $application->payment_reference);
         $this->assertSame($application->payment_reference, $response->json('reference_no'));
         $this->carrySessionCookies($response);

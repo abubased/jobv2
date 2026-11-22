@@ -1,13 +1,14 @@
 <?php
 
 /*
- * nearest_courier remains a form field for legacy/front-end compatibility.
- * Universal payment fee is fixed at BDT 20 and does not derive from this field.
+ * nearest_courier is stored application information. It is not the fee.
+ * The registration fee is the fixed payment_amount below.
  */
 
 return [
     'slug' => 'job-application',
-    'form_name' => 'Job Application',
+    'form_name' => 'চাকরির আবেদন',
+    'required_fields' => true,
     'description' => 'চাকরির আবেদন। রেজিস্ট্রেশন ফি স্থির ২০.০০ টাকা।',
     'enabled' => true,
     'reference_prefix' => 'JOB',
@@ -70,15 +71,12 @@ return [
         ],
         [
             'name' => 'nearest_courier',
-            'label' => 'রেজিস্ট্রেশন ফি',
-            'type' => 'select',
-            'required' => true,
-            'default' => '20',
-            'options' => [
-                ['value' => '20', 'label' => '২০ টাকা'],
-            ],
-            'validation' => ['required', 'in:20'],
-            'help_text' => 'রেজিস্ট্রেশন ফি স্থির ২০ টাকা।',
+            'label' => 'নিকটস্থ কুরিয়ার',
+            'type' => 'text',
+            'required' => false,
+            'default' => null,
+            'validation' => ['nullable', 'string', 'max:255'],
+            'help_text' => 'এই ঘরের মান ফি নয়। রেজিস্ট্রেশন ফি স্থির ২০.০০ টাকা।',
             'section' => 'ফি',
             'order' => 50,
         ],
@@ -91,7 +89,7 @@ return [
         'mother' => ['nullable', 'string', 'max:255'],
         'education' => ['required', 'string', 'in:primary,secondary,higher_secondary,bachelor,masters'],
         'courier_help' => ['required', 'string', 'in:yes,no'],
-        'nearest_courier' => ['required', 'in:20'],
+        'nearest_courier' => ['nullable', 'string', 'max:255'],
     ],
     'payment_amount' => '20.00',
     'payment_amount_source' => ['type' => 'fixed'],

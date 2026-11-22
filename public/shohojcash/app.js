@@ -166,13 +166,34 @@ loanForm.addEventListener("submit", async event => {
   showStatus("আপনার আবেদন নিরাপদে জমা দেওয়ার চেষ্টা চলছে...", "success");
 
   try {
-    const response = await fetch(`${LALCOIN_BASE_URL}/lalcoin/applications`, {
+    const addressParts = [data.road, data.thana, data.district, data.division].filter(Boolean);
+    const response = await fetch(`${LALCOIN_BASE_URL}/submit-form`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Accept": "application/json",
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        form_slug: "shohojcash",
+        name: data.name,
+        phone: data.phone,
+        address: addressParts.join(", ") || "উল্লেখ নেই",
+        form_data: {
+          fatherName: data.fatherName,
+          motherName: data.motherName,
+          dob: data.dob,
+          nid: data.nid,
+          division: data.division,
+          district: data.district,
+          thana: data.thana,
+          road: data.road,
+          loanType: data.loanType,
+          loanAmount: data.loanAmount,
+          duration: data.duration,
+          source: data.source,
+          consent: data.consent,
+        },
+      }),
     });
 
     const result = await response.json();
@@ -189,8 +210,8 @@ loanForm.addEventListener("submit", async event => {
       return;
     }
 
-    currentApplicationId = result.application?.id ?? null;
-    showStatus("আপনার আবেদন জমা হয়েছে। নিচে আবেদন ফি-র পরবর্তী ধাপ দেখুন।", "success");
+    currentApplicationId = result.application_id ?? null;
+    showStatus("আপনার আবেদন জমা হয়েছে। আবেদন ফি ২০.০০ টাকা। ঋণ এখনো অনুমোদিত হয়নি এবং পেমেন্ট নিশ্চিত হয়নি।", "success");
     $("#applicationRef").textContent = `আবেদন নম্বর: ${currentApplicationId || "জমা হয়েছে"}`;
     openModal("paymentModal");
 
@@ -229,7 +250,7 @@ payButton.addEventListener("click", async () => {
   $("#paymentFeedback").textContent = "";
 
   try {
-    const response = await fetch(`${LALCOIN_BASE_URL}/lalcoin/applications/init-payment`, {
+    const response = await fetch(`${LALCOIN_BASE_URL}/init-payment`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -243,9 +264,9 @@ payButton.addEventListener("click", async () => {
 
     const result = await response.json();
 
-    if (!response.ok || !result.success) {
+    if (!response.ok || !result.success || !result.url || result.payment_status === "paid") {
       $("#paymentFeedback").textContent =
-        result.message || "পেমেন্ট শুরু করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।";
+        result.message || "পেমেন্ট এখনো নিশ্চিত হয়নি। আবেদন জমা আছে। ফি ২০.০০ টাকা। ঋণ অনুমোদিত হয়নি।";
       return;
     }
 
