@@ -1,0 +1,69 @@
+// Used ES3 version code for major browser support
+function showWarningMessage() {
+  document.body.style.backgroundColor = '#00000061'
+  document.body.style.boxSizing = 'border-box';
+  document.body.style.margin = '0';
+  document.getElementsByClassName('legacy_footer__copyright')[0].textContent +=
+    getCopyrightText()
+  document.getElementsByClassName('legacy_container')[0].style.display = 'block';
+  document.getElementById('app').style.display = 'none'
+}
+
+function getCopyrightText() {
+  var currentYear = new Date().getFullYear();
+  return currentYear + ' Method One, All Rights Reserved';
+}
+
+// For preventing loading broken UI on firefox version less than 26
+function isFirefoxVersionLessThan26() {
+  var userAgent = navigator.userAgent;
+  var isFirefox = userAgent.indexOf('Firefox') !== -1;
+
+  if (isFirefox) {
+    var firefoxVersion = parseInt(userAgent.split('Firefox/')[1]);
+    if (firefoxVersion < 36) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Check if `Proxy` feature is  available or not on a browser
+function isProxyFeatureUnavailableOnBrowser() {
+  if (typeof Proxy === 'undefined') {
+    return true;
+  }
+  return false;
+}
+
+function isInputTypeOfInputEventUnavailableOnBrowser() {
+  if (typeof window.InputEvent === 'undefined') {
+    return true;
+  }
+ 
+  try {
+    var input = document.createElement('input');
+    var event = new InputEvent('input')
+    return !('inputType' in event);
+  } catch (e) {
+    return true;
+  }
+}
+
+function shouldShowWarningMessage() {
+  if (isFirefoxVersionLessThan26()) {
+    showWarningMessage();
+    return;
+  }
+
+  if (isInputTypeOfInputEventUnavailableOnBrowser()) {
+    showWarningMessage();
+    return;
+  }
+  
+  if (isProxyFeatureUnavailableOnBrowser()) {
+      showWarningMessage();
+  }
+}
+
+shouldShowWarningMessage();

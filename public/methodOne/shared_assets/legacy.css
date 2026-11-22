@@ -1,0 +1,118 @@
+/* stylelint-disable media-feature-range-notation */
+/* stylelint-disable property-no-vendor-prefix */
+/* stylelint-disable selector-class-pattern */
+.legacy_container {
+  width: 95%;
+  max-width: 575px;
+  max-height: 560px;
+  margin: 0 auto;
+  background-color: #fff;
+}
+
+.legacy_header {
+  max-height: 64.22px;
+  padding: 12px 16px;
+  text-align: center;
+}
+
+.legacy_header__logo {
+  display: inline;
+  width: 88px;
+}
+
+.legacy_msg_container {
+  position: relative;
+  height: 445px;
+  padding-right: 16px;
+  padding-left: 16px;
+  font-size: 14px;
+  color: #fff;
+  background-color: #e2136e;
+}
+
+.legacy__msg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 85%;
+  margin: 0;
+  font-weight: 500;
+  text-align: center;
+  -webkit-transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%);
+}
+
+.legacy_footer {
+  padding: 12px;
+  font-size: 10px;
+  font-weight: normal;
+  line-height: 1;
+  color: #e2136e;
+  text-align: center;
+}
+
+.legacy_footer__helpline-icon {
+  display: inline-block !important;
+  width: 12px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.legacy_footer__helpline-number {
+  display: inline-block;
+  margin: 0;
+  color: #e2136e;
+  text-align: left;
+  /* stylelint-disable-next-line plugin/no-unsupported-browser-features */
+  text-decoration: none;
+  vertical-align: middle;
+}
+
+.legacy_footer__copyright {
+  margin: 8px 0 0;
+  font-weight: 400;
+  color: #6f6f6f;
+}
+
+@media only screen and (min-width: 360px) {
+  .legacy_container {
+    width: 91%;
+  }
+}
+
+@media only screen and (min-width: 576px) {
+  .legacy_container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    max-height: none;
+    margin: 0 auto;
+    -webkit-transform: translate(-50%, -50%);
+    transform: translate(-50%, -50%);
+  }
+
+  .legacy_header__logo {
+    width: unset;
+  }
+
+  .legacy_header {
+    max-height: 88px;
+    padding: 12px 32px;
+  }
+
+  .legacy_msg_container {
+    height: 522px;
+    padding-right: 32px;
+    padding-left: 32px;
+    font-size: 20px;
+  }
+
+  .legacy_footer {
+    padding: 12px 32px;
+    font-size: 12px;
+  }
+
+  .legacy_footer__helpline-icon {
+    width: 18px;
+  }
+}

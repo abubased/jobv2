@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lalcoin Gateway Client — ডকুমেন্টেশন</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f5f6f8;--surface:#fff;--ink:#16203a;--muted:#5b6478;--line:#dfe3ea;--red:#b3261e;--red-soft:#fbeceb;--brass:#a97b16;--code:#101828;--code-ink:#e6ebf5;--ok:#1d6b45;--warn:#9a5b00}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1524;--surface:#172033;--ink:#e8ecf5;--muted:#9aa5bd;--line:#2a3550;--red:#ff8a80;--red-soft:#33191c;--brass:#e0b04a;--code:#0a0f1c;--ok:#6fd3a0;--warn:#f0b35c}}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:120px}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 17px/1.8 "Hind Siliguri","Noto Sans Bengali","Kalpurush",system-ui,sans-serif}
+.wrap{max-width:900px;margin:0 auto;padding:0 20px}
+header.top{position:sticky;top:0;z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
+.bar{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:10px 0}
+.brand{font-weight:700}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:3px;background:var(--bg)}
+.seg button{font:inherit;font-size:15px;border:0;background:none;color:var(--muted);padding:4px 16px;border-radius:999px;cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--red);color:#fff}
+@media (prefers-color-scheme:dark){.seg button[aria-pressed=true]{color:#1a0a0a}}
+button:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
+nav.toc{display:flex;gap:4px 16px;flex-wrap:wrap;padding:0 0 8px;font-size:14.5px}
+nav.toc a{color:var(--muted);text-decoration:none}
+nav.toc a:hover{color:var(--red)}
+body[data-mode=general] .dev,body[data-mode=dev] .gen{display:none}
+.hero{display:grid;grid-template-columns:1fr auto;gap:28px;align-items:center;padding:48px 0 24px}
+.hero h1{font-size:clamp(28px,5vw,44px);line-height:1.25;margin:0 0 12px;font-weight:700}
+.hero p{margin:0;color:var(--muted);max-width:56ch}
+.coin{width:132px;height:132px;border-radius:50%;background:var(--red);color:#fff;display:grid;place-items:center;text-align:center;font-weight:700;font-size:38px;line-height:1.1;border:6px double var(--brass);flex:none}
+.coin small{display:block;font-size:13px;font-weight:500;opacity:.9}
+@media (max-width:640px){.hero{grid-template-columns:1fr}.coin{width:96px;height:96px;font-size:28px}}
+section{padding:28px 0;border-top:1px solid var(--line)}
+h2{font-size:26px;line-height:1.3;margin:0 0 12px}
+h3{font-size:19px;margin:24px 0 6px}
+p{margin:0 0 12px;max-width:70ch}
+.lead{font-size:19px}
+.path{display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin:20px 0;position:relative}
+.path .n{padding:0 10px;text-align:center;position:relative}
+.path .n::before{content:"";position:absolute;top:22px;left:-50%;width:100%;height:2px;background:var(--line);z-index:0}
+.path .n:first-child::before{display:none}
+.path b.c{position:relative;z-index:1;display:grid;place-items:center;width:46px;height:46px;border-radius:50%;background:var(--red);color:#fff;margin:0 auto 8px}
+@media (prefers-color-scheme:dark){.path b.c{color:#1a0a0a}}
+.path span{display:block;font-size:15px;color:var(--muted);line-height:1.5}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:16px 0}
+@media (max-width:640px){.cols{grid-template-columns:1fr}.path{grid-template-columns:1fr;gap:14px}.path .n::before{display:none}}
+.box{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 18px}
+.box h3{margin-top:0}
+.box ul{margin:0;padding-left:20px}
+.box.yes{border-left:4px solid var(--ok)}.box.no{border-left:4px solid var(--red)}
+.note{background:var(--red-soft);border-left:4px solid var(--red);padding:12px 16px;border-radius:6px;margin:16px 0}
+ol.steps{padding-left:22px}ol.steps li{margin-bottom:8px}
+details{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 16px;margin-bottom:8px}
+summary{cursor:pointer;font-weight:600}
+code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.88em;background:var(--bg);padding:1px 6px;border-radius:4px;border:1px solid var(--line)}
+pre{background:var(--code);color:var(--code-ink);padding:14px 16px;border-radius:8px;overflow-x:auto;font:13.5px/1.6 ui-monospace,Menlo,Consolas,monospace;margin:8px 0 16px;max-width:100%}
+pre code{background:none;border:0;padding:0;color:inherit;font-size:inherit}
+.tw{overflow-x:auto;margin:8px 0 18px}
+table{border-collapse:collapse;width:100%;font-size:15px;line-height:1.55;background:var(--surface)}
+th,td{border:1px solid var(--line);padding:7px 11px;text-align:left;vertical-align:top}
+th{background:var(--bg);font-weight:600}
+.tag{display:inline-block;font-size:13px;padding:0 9px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.hi{color:var(--red)}.mid{color:var(--warn)}.lo{color:var(--muted)}
+svg{max-width:100%;height:auto;display:block}
+svg text{font:13px "Hind Siliguri",system-ui,sans-serif;fill:var(--ink)}
+svg .b{fill:var(--surface);stroke:var(--line);stroke-width:1.5}
+svg .a{fill:var(--red-soft);stroke:var(--red);stroke-width:1.5}
+svg .l{stroke:var(--muted);stroke-width:1.5;fill:none}
+svg .s{fill:var(--muted);font-size:11.5px}
+footer{padding:28px 0 56px;color:var(--muted);font-size:14.5px;border-top:1px solid var(--line)}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+</style>
+</head>
+<body data-mode="general">
+
+<header class="top"><div class="wrap">
+  <div class="bar">
+    <span class="brand">Lalcoin Gateway Client</span>
+    <div class="seg" role="group" aria-label="পাঠকের ধরন">
+      <button type="button" data-set="general" aria-pressed="true">সাধারণ পাঠক</button>
+      <button type="button" data-set="dev" aria-pressed="false">ডেভেলপার</button>
+    </div>
+  </div>
+  <nav class="toc gen" aria-label="সূচি"><a href="#g-what">এটি কী</a><a href="#g-see">আপনি কী দেখেন</a><a href="#g-do">ভেতরে কী ঘটে</a><a href="#g-limits">কী করে না</a><a href="#g-faq">প্রশ্নোত্তর</a></nav>
+  <nav class="toc dev" aria-label="সূচি"><a href="#d-arch">Architecture</a><a href="#d-flow">Request flow</a><a href="#d-api">API communication</a><a href="#d-gw">Gateway Client</a><a href="#d-int">Integration points</a><a href="#d-issues">Known issues</a><a href="#d-src">Source files</a></nav>
+</div></header>
+
+<main class="wrap">
+<div class="hero">
+  <div>
+    <h1>Gateway Client: পেমেন্ট পেজ আর APay-এর মধ্যে বার্তাবাহক</h1>
+    <p>Lalcoin-এ ৯৯ টাকার পেমেন্ট নেওয়ার সময় ব্যবহারকারীর দেওয়া তথ্য পেমেন্ট সেবা APay-তে পৌঁছে দেয় যে অংশ, এই ডকুমেন্টে তার উদ্দেশ্য, কার্যপ্রণালী ও কোড-স্তরের কাঠামো ব্যাখ্যা করা হয়েছে। উপরের সুইচ থেকে আপনার জন্য উপযুক্ত অংশটি বেছে নিন।</p>
+  </div>
+  <div class="coin" aria-hidden="true"><span>৯৯৳<small>নির্ধারিত ফি</small></span></div>
+</div>
+
+<!-- ============ সাধারণ পাঠক ============ -->
+<div class="gen">
+<section id="g-what">
+  <h2>Gateway Client কী এবং কেন দরকার</h2>
+  <p class="lead">ধরুন আপনি দোকানে টাকা দিতে চান, কিন্তু টাকা নেওয়ার কাজটি করে ব্যাংকের একজন প্রতিনিধি। দোকানি নিজে আপনার পিন বা কোড যাচাই করতে পারেন না। তিনি শুধু আপনার দেওয়া তথ্য প্রতিনিধির কাছে পৌঁছে দেন এবং উত্তর ফেরত আনেন।</p>
+  <p>Lalcoin-এ Gateway Client ঠিক সেই দোকানির ভূমিকা পালন করে। এটি একটি ছোট সফটওয়্যার অংশ। এর একমাত্র কাজ হলো আপনার দেওয়া অ্যাকাউন্ট নম্বর, পিন ও OTP কোড <strong>APay</strong> নামের পেমেন্ট সেবায় পাঠানো এবং APay কী উত্তর দিল তা Lalcoin-কে জানানো। টাকা সরানোর সিদ্ধান্ত APay-ই নেয়।</p>
+</section>
+
+<section id="g-see">
+  <h2>আপনি কী দেখেন</h2>
+  <ol class="steps">
+    <li><strong>ফর্ম পূরণ:</strong> নাম, ঠিকানা, ফোন নম্বর, কয়েনের সংখ্যা ও সাল দিয়ে আবেদন জমা দেন। এই মুহূর্তে কোনো টাকা কাটা হয় না।</li>
+    <li><strong>পেমেন্ট মাধ্যম বাছাই:</strong> bKash, Nagad, Rocket বা Upay-এর লোগো থেকে একটি বেছে “চালিয়ে যান” চাপেন।</li>
+    <li><strong>পেমেন্ট জানালা:</strong> পেজের ভেতরেই একটি ছোট জানালা খোলে। সেখানে তিনটি ধাপ আসে।</li>
+  </ol>
+  <div class="path" role="list">
+    <div class="n" role="listitem"><b class="c">১</b><strong>অ্যাকাউন্ট নম্বর</strong><span>১১ অঙ্কের মোবাইল নম্বর</span></div>
+    <div class="n" role="listitem"><b class="c">২</b><strong>পিন</strong><span>৪ বা ৫ অঙ্কের গোপন পিন</span></div>
+    <div class="n" role="listitem"><b class="c">৩</b><strong>OTP</strong><span>৬ অঙ্কের এককালীন কোড</span></div>
+  </div>
+  <p>প্রতিটি ধাপে আপনি “নিশ্চিত করুন” চাপলে Gateway Client সেই তথ্য APay-তে পাঠায়। APay “ঠিক আছে” বললে পরের ধাপ আসে। “ঠিক নেই” বললে ভুলের বার্তা দেখানো হয়।</p>
+</section>
+
+<section id="g-do">
+  <h2>পর্দার পেছনে কী ঘটে</h2>
+  <div class="cols">
+    <div class="box"><h3>ধাপ ১: অ্যাকাউন্ট যাচাই</h3><p>নম্বরটি APay-কে পাঠানো হয়। APay একটি লেনদেন-নম্বর (transaction id) তৈরি করে ফেরত দেয়। পরের দুই ধাপে এই নম্বর দিয়েই লেনদেনটি শনাক্ত হয়।</p></div>
+    <div class="box"><h3>ধাপ ২: পিন পাঠানো</h3><p>লেনদেন-নম্বরের সঙ্গে পিন APay-তে যায়। APay যাচাই করে সফল বা ব্যর্থ জানায়।</p></div>
+    <div class="box"><h3>ধাপ ৩: OTP পাঠানো</h3><p>লেনদেন-নম্বরের সঙ্গে OTP যায়। APay সফল বললে পেমেন্ট সম্পন্ন দেখানো হয়।</p></div>
+    <div class="box"><h3>সংযোগ না পেলে</h3><p>APay-র সঙ্গে যোগাযোগ করা না গেলে “পেমেন্ট গেটওয়ের সঙ্গে যোগাযোগ করা যায়নি, আবার চেষ্টা করুন” জাতীয় বার্তা আসে।</p></div>
+  </div>
+  <p>পরিমাণ (৯৯ টাকা) এবং গোপন চাবি (API key) সার্ভারেই থাকে। আপনার ব্রাউজার কখনো এগুলো পাঠায় না, তাই কেউ পেজ বদলে টাকার অঙ্ক কমাতে পারে না।</p>
+</section>
+
+<section id="g-limits">
+  <h2>এটি কী করে, কী করে না</h2>
+  <div class="cols">
+    <div class="box yes"><h3>করে</h3><ul><li>তিনটি ধাপের তথ্য APay-তে পাঠায়</li><li>APay-র উত্তর (সফল/ব্যর্থ) বুঝে নেয়</li><li>ব্যর্থ হলে ব্যবহারকারীকে ভুলের কারণ দেখায়</li></ul></div>
+    <div class="box no"><h3>করে না</h3><ul><li>সরাসরি bKash, Nagad, Rocket বা Upay-র সঙ্গে কথা বলে না। সব কিছু APay হয়ে যায়</li><li>নিজে টাকা কাটে না বা সরায় না</li><li>কয়েনের সংখ্যা দেখে ফি বদলায় না। ফি সবসময় ৯৯ টাকা</li></ul></div>
+  </div>
+  <div class="note"><strong>নিরাপত্তা সতর্কতা:</strong> বর্তমান কোডে পিন ও OTP ডেটাবেসে সংরক্ষিত হয় এবং অ্যাডমিন তালিকায় দেখা যায়। এটি গুরুতর ঝুঁকি। বিস্তারিত “ডেভেলপার” অংশের Known issues-এ আছে। আসল পিন বা OTP কোথাও সংরক্ষণ করা উচিত নয়।</div>
+</section>
+
+<section id="g-faq">
+  <h2>প্রশ্নোত্তর</h2>
+  <details><summary>ফর্ম জমা দিলেই কি টাকা কাটা হয়?</summary><p>না। ফর্ম জমা শুধু আপনার আবেদন সংরক্ষণ করে। টাকার কাজ শুরু হয় আপনি মাধ্যম বেছে তিনটি ধাপ শেষ করলে।</p></details>
+  <details><summary>সব মাধ্যম কি এখন কাজ করে?</summary><p>কোডে bKash ও Nagad-এর পেমেন্ট পেজ আছে। Rocket ও Upay বাছাই করা গেলেও তাদের পেজ এখনো তৈরি হয়নি, তাই সেগুলো শেষ পর্যন্ত চলবে না।</p></details>
+  <details><summary>পেমেন্ট শেষে আমার আবেদনে “পরিশোধিত” লেখা হয় কি?</summary><p>বর্তমান কোডে হয় না। আবেদনের অবস্থা “initiated” (শুরু হয়েছে) থেকেই যায়। এটি একটি জানা অসম্পূর্ণতা।</p></details>
+  <details><summary>একই ফোন নম্বর দিয়ে দুবার আবেদন করা যায়?</summary><p>না। ফোন নম্বর অনন্য হতে হয়, তাই দ্বিতীয়বার চেষ্টা করলে সার্ভার ত্রুটি দেয়।</p></details>
+</section>
+</div>
+
+<!-- ============ ডেভেলপার ============ -->
+<div class="dev">
+<section id="d-arch">
+  <h2>Architecture</h2>
+  <p>Laravel অ্যাপ্লিকেশন। পাবলিক পেজ Inertia + Vue 3 (<code>LalcoinLanding.vue</code>), পেমেন্ট অংশ আলাদা Blade মডিউল (<code>app/Modules/Payment</code>)। Gateway Client হলো <code>RealApayGateway</code>, যা Laravel HTTP client দিয়ে APay REST API ডাকে। <code>config/payment.php</code>-এ <code>default_gateway = apay</code>; <code>ApayGateway</code> একটি লোকাল stub, সক্রিয় নয়।</p>
+  <svg viewBox="0 0 760 250" role="img" aria-label="Architecture diagram">
+    <defs><marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8z" fill="var(--muted)"/></marker></defs>
+    <rect class="b" x="6" y="30" width="160" height="80" rx="8"/><text x="86" y="62" text-anchor="middle">Browser</text><text class="s" x="86" y="82" text-anchor="middle">Vue page + iframe</text>
+    <rect class="b" x="236" y="30" width="190" height="80" rx="8"/><text x="331" y="62" text-anchor="middle">Laravel</text><text class="s" x="331" y="82" text-anchor="middle">LalcoinController</text><text class="s" x="331" y="98" text-anchor="middle">Payment controllers</text>
+    <rect class="a" x="496" y="30" width="130" height="80" rx="8"/><text x="561" y="62" text-anchor="middle">RealApayGateway</text><text class="s" x="561" y="82" text-anchor="middle">Gateway Client</text>
+    <rect class="b" x="676" y="30" width="80" height="80" rx="8"/><text x="716" y="75" text-anchor="middle">APay API</text>
+    <path class="l" marker-end="url(#ar)" d="M166 70H234"/><path class="l" marker-end="url(#ar)" d="M426 70H494"/><path class="l" marker-end="url(#ar)" d="M626 70H674"/>
+    <text class="s" x="200" y="62" text-anchor="middle">HTTP</text><text class="s" x="460" y="62" text-anchor="middle">call</text><text class="s" x="650" y="62" text-anchor="middle">HTTPS</text>
+    <rect class="b" x="236" y="170" width="86" height="44" rx="8"/><text x="279" y="197" text-anchor="middle">MySQL</text>
+    <rect class="b" x="336" y="170" width="86" height="44" rx="8"/><text x="379" y="197" text-anchor="middle">Session</text>
+    <rect class="b" x="436" y="170" width="110" height="44" rx="8"/><text x="491" y="197" text-anchor="middle">Reverb + Mail</text>
+    <path class="l" marker-end="url(#ar)" d="M300 110V168"/><path class="l" marker-end="url(#ar)" d="M360 110V168"/><path class="l" marker-end="url(#ar)" d="M400 110L470 168"/>
+  </svg>
+  <div class="tw"><table>
+    <tr><th>অংশ</th><th>অবস্থান</th><th>ভূমিকা</th></tr>
+    <tr><td>Routes</td><td><code>routes/web.php</code></td><td><code>GET /lalcoin</code>, <code>POST /lalcoin/applications</code>, <code>POST /lalcoin/applications/init-payment</code> (কোনো <code>auth</code> নেই, CSRF আছে)</td></tr>
+    <tr><td>Controller</td><td><code>LalcoinController</code></td><td>পেজ রেন্ডার, আবেদন insert, signed payment URL তৈরি</td></tr>
+    <tr><td>Model</td><td><code>LalcoinApplication</code></td><td>টেবিল <code>lalcoin_applications</code></td></tr>
+    <tr><td>Payment module</td><td><code>app/Modules/Payment</code></td><td>অ্যাকাউন্ট / পিন / OTP স্ক্রিন ও কন্ট্রোলার; prefix <code>/payment</code></td></tr>
+    <tr><td>Gateway Client</td><td><code>Services/Gateways/RealApayGateway.php</code></td><td>APay-র জন্য HTTP client</td></tr>
+    <tr><td>Admin</td><td><code>GET /coin-applications</code></td><td>auth-সুরক্ষিত তালিকা; private channel <code>lalcoin-applications</code> শোনে</td></tr>
+  </table></div>
+  <p>Config: <code>APAY_BASE_URL</code>, <code>APAY_API_KEY</code> (<code>.env</code>), <code>PAYMENT_ROUTE_PREFIX</code> (অনির্ধারিত, ডিফল্ট <code>/payment</code>)। start route-এর নাম <code>apay-payment.start</code>।</p>
+</section>
+
+<section id="d-flow">
+  <h2>Request flow</h2>
+  <p><code>initPayment</code> কোনো গেটওয়ে ডাকে না; এটি শুধু signed URL বানায়। APay-তে আসল কল হয় iframe-এর তিনটি form post-এর সময়।</p>
+  <div class="tw"><table>
+    <tr><th>#</th><th>Client → Server</th><th>কী ঘটে</th></tr>
+    <tr><td>1</td><td><code>GET /lalcoin</code></td><td>Inertia <code>LalcoinLanding</code> রেন্ডার। কোনো props বা payment init নেই।</td></tr>
+    <tr><td>2</td><td><code>POST /lalcoin/applications</code> (JSON)</td><td>validate → <code>LalcoinApplication::create</code> → event <code>application.created</code> broadcast → mail। রেসপন্সে <code>application.id</code>।</td></tr>
+    <tr><td>3</td><td><code>POST /lalcoin/applications/init-payment</code> (JSON)</td><td>৩০ সেকেন্ডের cache lock <code>lalcoin-payment-init:{id}</code>; reference <code>LAL-{id}-{8 chars}</code>; <code>URL::signedRoute</code>; <code>payment_status = initiated</code>। রেসপন্সে <code>url</code>।</td></tr>
+    <tr><td>4</td><td>iframe <code>GET /payment/start?…&amp;signature</code></td><td><code>signed</code> middleware। query session key <code>apay_payment</code>-এ রাখা হয়, redirect <code>/payment/account-number</code>।</td></tr>
+    <tr><td>5</td><td><code>POST /payment/account-number</code></td><td>Gateway <code>step-one</code> → <code>transaction_id</code> session-এ। step = <code>pin</code>।</td></tr>
+    <tr><td>6</td><td><code>POST /payment/pin</code></td><td>Gateway <code>step-two</code>। step = <code>otp</code>।</td></tr>
+    <tr><td>7</td><td><code>POST /payment/otp</code></td><td>Gateway <code>step-three</code>। সফল হলে session <code>status = success</code>, success view।</td></tr>
+    <tr><td>8</td><td>Nagad: <code>GET /payment/callback?payment_status=success</code></td><td>১৫০০ ms পরে <code>window.top</code> redirect; <code>JobApplicationController::callback</code> চলে।</td></tr>
+  </table></div>
+</section>
+
+<section id="d-api">
+  <h2>API communication</h2>
+  <h3>ক) ব্রাউজার ↔ Laravel (public JSON)</h3>
+  <pre><code>POST /lalcoin/applications
+Content-Type: application/json
+Accept: application/json
+X-CSRF-TOKEN: &lt;csrf-token&gt;
+
+{ "name": "Karim Ahmed", "address": "Mirpur, Dhaka", "phone": "01700000000",
+  "coin_count": "100", "coin_year": "1971", "submitted": true }
+
+200 → { "success": true, "message": "...", "application": { "id": 15, "name": "...", "phone": "..." } }
+422 → { "message": "...", "errors": { "name": ["..."] } }</code></pre>
+  <pre><code>POST /lalcoin/applications/init-payment
+{ "application_id": 15, "method": "nagad" }      // method: nagad | bkash | rocket | upay
+
+200 → { "success": true, "method": "nagad", "method_name": "Nagad", "application_id": 15,
+        "url": "https://&lt;host&gt;/payment/start?reference_no=LAL-15-AB12CD34&amp;amount=99.00&amp;charge=0.00
+                &amp;merchant_name=...&amp;method=nagad&amp;return_url=...&amp;signature=&lt;signature&gt;" }
+409 → { "success": false, "message": "পেমেন্ট প্রস্তুত হচ্ছে। ..." }   // lock busy
+422 → অজানা application_id বা method</code></pre>
+  <p>পরিমাণ ক্লায়েন্ট থেকে আসে না; সার্ভারে <code>$amount = '99.00'</code> নির্ধারিত এবং signed URL তা লক করে।</p>
+
+  <h3>খ) iframe ↔ Laravel (form post)</h3>
+  <pre><code>POST /payment/account-number   _token=&lt;csrf&gt;&amp;account_number=01700000000   (digits, ১১)
+POST /payment/pin              _token=&lt;csrf&gt;&amp;pin=&lt;4-or-5-digits&gt;
+POST /payment/otp              _token=&lt;csrf&gt;&amp;otp=&lt;6-digits&gt;
+POST apay-payment.steps.otp.resend  (JSON; APay ডাকে না, লোকাল সফল বার্তা ফেরত দেয়)</code></pre>
+  <p>এগুলো <code>application/x-www-form-urlencoded</code>। কন্ট্রোলার redirect বা <code>back()</code> with errors দেয়; APay-র body ব্রাউজারে যায় না। <code>apay_payment</code> session না থাকলে middleware <code>apay-payment.session</code> HTTP 419 দেয়।</p>
+
+  <h3>গ) Laravel ↔ APay (Gateway Client-এর আউটবাউন্ড কল)</h3>
+  <pre><code>POST {APAY_BASE_URL}/transactions/step-one
+Content-Type: application/json
+Accept: application/json
+X-API-KEY: &lt;APAY_API_KEY&gt;
+
+{ "invoice_no": "LAL-15-AB12CD34", "merchant_name": "লাল কয়েন",
+  "amount": "99.00", "customer_input": "&lt;account_number&gt;" }
+
+POST {APAY_BASE_URL}/transactions/step-two
+{ "transaction_id": "&lt;step-one এর data.transaction_id&gt;", "second_input": "&lt;pin&gt;" }
+
+POST {APAY_BASE_URL}/transactions/step-three
+{ "transaction_id": "&lt;একই id&gt;", "backup_code": "&lt;otp&gt;" }</code></pre>
+</section>
+
+<section id="d-gw">
+  <h2>Gateway Client: <code>RealApayGateway</code></h2>
+  <div class="tw"><table>
+    <tr><th>Method</th><th>APay endpoint</th><th>ইনপুট</th><th>সফল হলে</th></tr>
+    <tr><td><code>verifyAccountNumber</code></td><td><code>/transactions/step-one</code></td><td>reference, merchant, amount, account number</td><td><code>data.transaction_id</code> session-এ (<code>apay_transaction_id</code>)</td></tr>
+    <tr><td>ধাপ ২ (পিন)</td><td><code>/transactions/step-two</code></td><td>transaction_id, pin</td><td>step → <code>otp</code></td></tr>
+    <tr><td>ধাপ ৩ (OTP)</td><td><code>/transactions/step-three</code></td><td>transaction_id, otp</td><td>session <code>status = success</code>, <code>transaction_id</code></td></tr>
+    <tr><td><code>resendOtp</code></td><td>কোনো কল নেই</td><td>—</td><td>লোকাল সফল বার্তা</td></tr>
+  </table></div>
+  <ul>
+    <li><strong>সাফল্যের শর্ত:</strong> response body-তে <code>success: true</code>। <code>message</code> ও <code>data</code> পড়া হয়।</li>
+    <li><strong>ব্যর্থতা:</strong> অন্য যেকোনো ফল <code>GatewayResponse::failure</code> হয়ে গেটওয়ের <code>message</code> বহন করে। connection failure হলে “Could not reach the payment gateway. Please try again.”</li>
+    <li><strong>Retry নেই:</strong> <code>retry_times</code> ও <code>retry_delay_ms</code> config আছে, কিন্তু ব্যবহৃত হয় না। হারানো response হলে ব্যবহারকারী আবার submit করতে পারে।</li>
+    <li><strong>Auth:</strong> <code>X-API-KEY</code> শুধু সার্ভার থেকে যায়, Vue পেজে বা signed URL-এ নেই।</li>
+  </ul>
+</section>
+
+<section id="d-int">
+  <h2>Integration points</h2>
+  <div class="tw"><table>
+    <tr><th>Integration point</th><th>বিবরণ</th></tr>
+    <tr><td>Gateway driver</td><td><code>config/payment.php → default_gateway</code>। নতুন প্রদানকারী যোগ করতে একই gateway interface ও <code>GatewayResponse</code> বাস্তবায়ন করে এখানে নির্ধারণ করুন।</td></tr>
+    <tr><td>Env</td><td><code>APAY_BASE_URL</code>, <code>APAY_API_KEY</code></td></tr>
+    <tr><td>Signed URL contract</td><td><code>reference_no, amount, charge, merchant_name, method, return_url, signature</code>। Lalcoin → Payment module-এর একমাত্র হ্যান্ডঅফ।</td></tr>
+    <tr><td>Session <code>apay_payment</code></td><td><code>reference_no, amount, charge, merchant_name, method, return_url, step, account_number, apay_transaction_id, status, transaction_id</code>। transaction id শুধু এখানে থাকে, DB-তে নয়।</td></tr>
+    <tr><td>DB হুক</td><td><code>reference_no</code> <code>LAL-</code> দিয়ে শুরু হলে <code>LalcoinApplication</code> আপডেট (<code>payment_number</code>, <code>payment_amount</code> JSON)।</td></tr>
+    <tr><td>Return URL</td><td><code>route('payment.callback')</code> + <code>application_id</code>, <code>method</code>; Nagad success-এ <code>payment_status=success</code> যোগ হয়।</td></tr>
+    <tr><td>postMessage</td><td>iframe → parent: <code>{ type: 'close-payment-modal' }</code> (শুধু bKash OTP cancel)। origin মিলিয়ে <code>handlePaymentModalMessage</code> modal বন্ধ করে।</td></tr>
+    <tr><td>Realtime</td><td>Private channel <code>lalcoin-applications</code>; events <code>LalcoinApplicationCreated</code>, <code>LalcoinPaymentAccountNumberSubmitted</code>, <code>…PinSubmitted</code>, <code>…OtpSubmitted</code>।</td></tr>
+    <tr><td>Notification</td><td><code>NewLalcoinApplicationNotification</code> দুটি hardcoded ঠিকানায় মেইল।</td></tr>
+    <tr><td>মাধ্যমভেদ</td><td>চারটি মাধ্যম একই gateway ও APay path ব্যবহার করে। পার্থক্য শুধু view: bKash (স্বতন্ত্র HTML, inline JS), Nagad (<code>payment</code> layout + <code>entry.js</code>), Rocket ও Upay (view অনুপস্থিত)।</td></tr>
+  </table></div>
+</section>
+
+<section id="d-issues">
+  <h2>Known issues ও নিরাপত্তা পর্যালোচনা</h2>
+  <div class="tw"><table>
+    <tr><th>মাত্রা</th><th>সমস্যা</th></tr>
+    <tr><td><span class="tag hi">উচ্চ</span></td><td>পিন (<code>payment_amount.pin_2</code>) ও OTP (<code>payment_amount.code</code>) ডেটাবেসে সংরক্ষিত এবং অ্যাডমিন UI-তে প্রদর্শিত। OTP APay গ্রহণ করার আগেই সেভ হয়।</td></tr>
+    <tr><td><span class="tag hi">উচ্চ</span></td><td><code>DELETE /coin-applications/{application}</code>-এ <code>auth</code> নেই।</td></tr>
+    <tr><td><span class="tag mid">মাঝারি</span></td><td><code>init-payment</code>-এ শুধু <code>exists</code> চেক। ownership token নেই এবং <code>payment_status</code> unpaid কি না দেখা হয় না।</td></tr>
+    <tr><td><span class="tag mid">মাঝারি</span></td><td><code>payment.callback</code> query থেকে <code>payment_status</code> বিশ্বাস করে <code>job_applications</code> আপডেট করে। Lalcoin row কখনো paid হয় না, status <code>initiated</code> থাকে, APay transaction id সংরক্ষিত হয় না।</td></tr>
+    <tr><td><span class="tag mid">মাঝারি</span></td><td><code>payment_number</code> ও <code>payment_amount</code>-এর জন্য Lalcoin migration নেই। live DB হাতে বদলানো না হলে ধাপগুলো SQL error দেবে।</td></tr>
+    <tr><td><span class="tag mid">মাঝারি</span></td><td>Rocket/Upay view নেই। <code>PaymentController::failed</code> অনির্ধারিত <code>$method</code> ব্যবহার করে (লাইন ৭৬)।</td></tr>
+    <tr><td><span class="tag lo">নিম্ন</span></td><td>সার্ভারে <code>coin_count</code>/<code>coin_year</code> nullable, কিন্তু কলাম non-null। ফোনের duplicate চেক কমেন্ট করা; unique index সার্ভার ত্রুটি দেয়।</td></tr>
+    <tr><td><span class="tag lo">নিম্ন</span></td><td>Retry config অব্যবহৃত। bKash success <code>payment.callback</code> দিয়ে ফেরে না, <code>route('home')</code>-এ যায়।</td></tr>
+  </table></div>
+  <p><strong>ইতিবাচক দিক:</strong> API key সার্ভারে থাকে; পরিমাণ সার্ভারে নির্ধারিত ও signed URL-এ লক; mass assignment validated key-তে সীমিত; সাফল্য নির্ধারিত হয় সার্ভারের APay কল থেকে, ক্লায়েন্টের পতাকা থেকে নয়।</p>
+</section>
+
+<section id="d-src">
+  <h2>Source files</h2>
+  <p>মূল বিশ্লেষণ-ফাইল <code>lalcoin-payment-workflow-analysis.md</code> (২১ নভেম্বর ২০২৬, শুধু পাঠ-বিশ্লেষণ) থেকে প্রস্তুত।</p>
+  <pre><code>app/Http/Controllers/LalcoinController.php
+app/Models/LalcoinApplication.php
+app/Events/Lalcoin*.php            app/Notifications/NewLalcoinApplicationNotification.php
+resources/js/pages/LalcoinLanding.vue
+resources/js/pages/LalcoinApplications/Index.vue
+app/Modules/Payment/config/payment.php
+app/Modules/Payment/routes/web.php
+app/Modules/Payment/Http/Controllers/{Payment,AccountNumber,Pin,Otp}Controller.php
+app/Modules/Payment/Services/Gateways/RealApayGateway.php
+app/Modules/Payment/Services/PaymentSession.php
+app/Modules/Payment/resources/{js,views}/…</code></pre>
+</section>
+</div>
+</main>
+
+<footer><div class="wrap">Lalcoin Gateway Client ডকুমেন্টেশন · ২১ নভেম্বর ২০২৬ · কোড পরিবর্তন ছাড়া শুধু পাঠ-বিশ্লেষণ থেকে তৈরি। গোপন চাবি, পিন ও OTP এই নথিতে নেই।</div></footer>
+
+<script>
+(function(){
+  var b=document.body,btns=document.querySelectorAll('[data-set]');
+  function set(m){b.dataset.mode=m;btns.forEach(function(x){x.setAttribute('aria-pressed',x.dataset.set===m)});window.scrollTo(0,0)}
+  btns.forEach(function(x){x.addEventListener('click',function(){set(x.dataset.set);try{history.replaceState(null,'','#'+x.dataset.set)}catch(e){}})});
+  if(location.hash==='#dev'){set('dev')}
+})();
+</script>
+</body>
+</html>
