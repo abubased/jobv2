@@ -114,8 +114,13 @@ return [
         'address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),
         'name' => env('MAIL_FROM_NAME', 'Example'),
     ],
-    'admin_notification_email' => env(
-        'ADMIN_NOTIFICATION_EMAIL'
-    ),
+    /*
+    | Submission mail uses this address for every form. Leave it empty to
+    | skip the administrator copy. Merchant copies come from each form
+    | configuration. Mail is sent during the request because production
+    | has no queue worker. Set MAIL_MAILER, MAIL_HOST, MAIL_PORT,
+    | MAIL_USERNAME, MAIL_PASSWORD, and MAIL_FROM_ADDRESS on the server.
+    */
+    'admin_notification_email' => env('ADMIN_NOTIFICATION_EMAIL'),
 
 ];

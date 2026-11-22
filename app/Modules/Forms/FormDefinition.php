@@ -105,9 +105,19 @@ class FormDefinition
     /**
      * @return list<string>
      */
+    public function merchantNotificationEmails(): array
+    {
+        $emails = $this->config['merchant_notification_emails'] ?? [];
+
+        return is_array($emails) ? array_values(array_filter($emails, 'is_string')) : [];
+    }
+
+    /**
+     * @return list<string>
+     */
     public function notificationEmails(): array
     {
-        $emails = $this->config['merchant_notification_emails'];
+        $emails = $this->merchantNotificationEmails();
 
         if (is_string($this->config['admin_notification_email']) && $this->config['admin_notification_email'] !== '') {
             $emails[] = $this->config['admin_notification_email'];

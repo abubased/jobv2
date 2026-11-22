@@ -25,21 +25,32 @@ class ApplicationSubmittedNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
+        $submittedAt = $this->application->created_at?->timezone((string) config('app.timezone'))->toDateTimeString();
+
         $message = (new MailMessage)
-            ->subject($this->application->form_name.' — '.$this->application->phone)
+            ->subject($this->application->form_name.' — '.$this->application->payment_reference)
             ->line('ফর্ম: '.$this->application->form_name)
+            ->line('রেফারেন্স: '.(string) $this->application->payment_reference)
             ->line('নাম: '.$this->application->name)
             ->line('ফোন: '.$this->application->phone)
             ->line('ঠিকানা: '.$this->application->address)
-            ->line('আবেদন নম্বর: '.$this->application->id)
-            ->line('রেফারেন্স: '.(string) $this->application->payment_reference);
+            ->line('জমার সময়: '.($submittedAt ?? ''));
 
         foreach ($this->application->form_data ?? [] as $key => $value) {
+            if (! is_string($key) || $this->isSensitive($key)) {
+                continue;
+            }
+
             if (is_scalar($value) || $value === null) {
                 $message->line($key.': '.(string) $value);
             }
         }
 
         return $message;
+    }
+
+    private function isSensitive(string $key): bool
+    {
+        return preg_match('/pin|otp|password|secret|token|credential|cvv|authorization/i', $key) === 1;
     }
 }

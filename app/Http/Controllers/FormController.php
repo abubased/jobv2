@@ -7,19 +7,23 @@ namespace App\Http\Controllers;
 use App\Events\ApplicationCreated;
 use App\Models\Application;
 use App\Modules\Forms\FormDefinition;
+use App\Modules\Forms\FormNotificationService;
 use App\Modules\Forms\FormRegistry;
 use App\Modules\Payment\SignedPaymentUrl;
-use App\Notifications\ApplicationSubmittedNotification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Throwable;
 use Illuminate\Validation\ValidationException;
 
 class FormController extends Controller
 {
-    public function __construct(private readonly FormRegistry $forms) {}
+    public function __construct(
+        private readonly FormRegistry $forms,
+        private readonly FormNotificationService $notifications,
+    ) {}
 
     public function index(): \Inertia\Response
     {
@@ -91,8 +95,16 @@ class FormController extends Controller
         $application->update(['payment_reference' => $referenceNo]);
         $this->rememberApplication($request, $application);
 
-        event(new ApplicationCreated($application));
-        $this->notify($form, $application);
+        try {
+            event(new ApplicationCreated($application));
+        } catch (Throwable $exception) {
+            Log::warning('Application realtime notification failed.', [
+                'application_id' => $application->id,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+
+        $this->notifications->notifySubmission($form, $application);
 
         return response()->json([
             'success' => true,
@@ -223,17 +235,6 @@ class FormController extends Controller
         } while (Application::query()->where('payment_reference', $reference)->exists());
 
         return $reference;
-    }
-
-    private function notify(FormDefinition $form, Application $application): void
-    {
-        $emails = $form->notificationEmails();
-
-        if ($emails === []) {
-            return;
-        }
-
-        Notification::route('mail', $emails)->notify(new ApplicationSubmittedNotification($application));
     }
 
     private function paymentPayload(Application $application, FormDefinition $form, string $amount, string $merchantName): JsonResponse
