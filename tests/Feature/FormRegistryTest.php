@@ -42,7 +42,7 @@ final class FormRegistryTest extends TestCase
         $this->assertNotNull($forms->find('shohojcash'));
         $this->assertNull($forms->find('education-loan'));
         $this->get('/forms/education-loan')->assertNotFound();
-        $this->get('/forms/lalcoin')->assertOk();
+        $this->get('/forms/lalcoin')->assertRedirect('/lalcoin');
     }
 
     public function test_duplicate_slugs_are_rejected(): void
@@ -153,7 +153,7 @@ final class FormRegistryTest extends TestCase
             'form_data' => [
                 'education' => 'bachelor',
                 'courier_help' => 'yes',
-                'nearest_courier' => '5',
+                'nearest_courier' => '99',
             ],
         ]);
 
@@ -246,11 +246,19 @@ final class FormRegistryTest extends TestCase
         $this->assertSame(0, LalcoinApplication::query()->count());
     }
 
-    public function test_admin_list_requires_authentication(): void
+    public function test_admin_list_requires_authentication_and_admin_authorization(): void
     {
         $this->get('/all-applications')->assertRedirect();
 
-        $this->actingAs(User::factory()->create());
+        $this->actingAs(User::factory()->create([
+            'email' => 'non-admin@example.com',
+        ]));
+        $this->get('/all-applications')->assertForbidden();
+
+        config(['admin.emails' => ['admin@example.com']]);
+        $this->actingAs(User::factory()->create([
+            'email' => 'admin@example.com',
+        ]));
         $this->get('/all-applications')->assertOk();
     }
 

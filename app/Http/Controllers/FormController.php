@@ -16,21 +16,18 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-use Inertia\Inertia;
-use Inertia\Response;
 
 class FormController extends Controller
 {
     public function __construct(private readonly FormRegistry $forms) {}
 
-    public function show(string $slug): Response
+    public function index(): \Inertia\Response
     {
-        $form = $this->forms->find($slug);
-
-        abort_unless($form instanceof FormDefinition, 404);
-
-        return Inertia::render('Forms/Show', [
-            'form' => $form->toPublicArray(),
+        return \Inertia\Inertia::render('AllApplications/Index', [
+            'applications' => Application::query()
+                ->latest()
+                ->paginate(20)
+                ->withQueryString(),
         ]);
     }
 
@@ -195,16 +192,6 @@ class FormController extends Controller
         } finally {
             $lock->release();
         }
-    }
-
-    public function index(): Response
-    {
-        return Inertia::render('AllApplications/Index', [
-            'applications' => Application::query()
-                ->latest()
-                ->paginate(20)
-                ->withQueryString(),
-        ]);
     }
 
     private function rememberApplication(Request $request, Application $application): void

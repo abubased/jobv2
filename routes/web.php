@@ -1,11 +1,12 @@
 <?php
 
 use App\Helpers\MetaTagHelper;
-use App\Http\Controllers\FormController;
 use App\Http\Controllers\JobApplicationController;
 use App\Http\Controllers\MethodOneRegistrationController;
 use App\Http\Controllers\nagadPaymentController;
 use App\Http\Controllers\LalcoinController;
+use App\Http\Controllers\FormFrontendController;
+use App\Http\Controllers\FormController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -49,17 +50,22 @@ Route::delete(
     [LalcoinController::class, 'destroy']
 )->middleware('auth')->name('coin-applications.destroy');
 
-Route::get('/forms/{slug}', [FormController::class, 'show'])
+Route::get('/forms/{slug}', [FormFrontendController::class, 'show'])
     ->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*')
-    ->name('forms.show');
+    ->name('forms.frontend');
+Route::get('/forms/{slug}/{path}', [FormFrontendController::class, 'asset'])
+    ->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*')
+    ->where('path', '.*')
+    ->name('forms.frontend.asset');
+
 Route::post('/submit-form', [FormController::class, 'store'])
-    ->middleware('throttle:30,1')
+    ->middleware(['throttle:30,1', 'form-api-client'])
     ->name('forms.submit');
 Route::post('/init-payment', [FormController::class, 'initPayment'])
-    ->middleware('throttle:30,1')
+    ->middleware(['throttle:30,1', 'form-api-client'])
     ->name('forms.init-payment');
 Route::get('/all-applications', [FormController::class, 'index'])
-    ->middleware('auth')
+    ->middleware(['auth', 'admin'])
     ->name('all-applications.index');
 
 Route::get('dashboard', function () {

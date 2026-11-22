@@ -1,18 +1,21 @@
 <?php
 
 /*
- * nearest_courier remains the registration fee. The fee the server charges
- * is only a value from this field's options. A client-supplied payment_amount
- * is ignored.
+ * nearest_courier remains a form field for legacy/front-end compatibility.
+ * Universal payment fee is fixed at BDT 20 and does not derive from this field.
  */
 
 return [
     'slug' => 'job-application',
     'form_name' => 'Job Application',
-    'description' => 'চাকরির আবেদন। রেজিস্ট্রেশন ফি নির্বাচিত nearest_courier অনুযায়ী।',
+    'description' => 'চাকরির আবেদন। রেজিস্ট্রেশন ফি স্থির ২০.০০ টাকা।',
     'enabled' => true,
     'reference_prefix' => 'JOB',
     'merchant_name' => config('app.name'),
+    'frontend' => [
+        'type' => 'external',
+        'url' => '/',
+    ],
     'fields' => [
         [
             'name' => 'father_or_husband',
@@ -73,10 +76,9 @@ return [
             'default' => '20',
             'options' => [
                 ['value' => '20', 'label' => '২০ টাকা'],
-                ['value' => '99', 'label' => '৯৯ টাকা'],
             ],
-            'validation' => ['required', 'in:20,99'],
-            'help_text' => 'এই নির্বাচনই রেজিস্ট্রেশন ফি। অন্য কোনো পরিমাণ গ্রহণ করা হয় না।',
+            'validation' => ['required', 'in:20'],
+            'help_text' => 'রেজিস্ট্রেশন ফি স্থির ২০ টাকা।',
             'section' => 'ফি',
             'order' => 50,
         ],
@@ -89,17 +91,10 @@ return [
         'mother' => ['nullable', 'string', 'max:255'],
         'education' => ['required', 'string', 'in:primary,secondary,higher_secondary,bachelor,masters'],
         'courier_help' => ['required', 'string', 'in:yes,no'],
-        'nearest_courier' => ['required', 'in:20,99'],
+        'nearest_courier' => ['required', 'in:20'],
     ],
-    'payment_amount' => null,
-    'payment_amount_source' => [
-        'type' => 'field',
-        'field' => 'nearest_courier',
-        'map' => [
-            '20' => '20.00',
-            '99' => '99.00',
-        ],
-    ],
+    'payment_amount' => '20.00',
+    'payment_amount_source' => ['type' => 'fixed'],
     'accepted_payment_methods' => ['nagad', 'bkash', 'rocket', 'upay'],
     'merchant_notification_emails' => [],
     'admin_notification_email' => filled(config('mail.admin_notification_email'))

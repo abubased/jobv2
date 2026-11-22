@@ -16,6 +16,11 @@ return [
     'enabled' => true,
     'reference_prefix' => 'LOAN',
     'merchant_name' => config('shohojcash.merchant_name'),
+    'frontend' => [
+        'type' => 'local',
+        'directory' => 'shohojcash',
+        'entry' => 'index.html',
+    ],
     'fields' => [
         [
             'name' => 'fatherName',

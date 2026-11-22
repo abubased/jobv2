@@ -28,6 +28,11 @@ return Application::configure(basePath: dirname(__DIR__))
             'lalcoin/applications',
             'lalcoin/applications/init-payment',
         ]);
+
+        $middleware->alias([
+            'form-api-client' => \App\Http\Middleware\EnsureFormApiCredential::class,
+            'admin' => \App\Http\Middleware\EnsureUserIsAdmin::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

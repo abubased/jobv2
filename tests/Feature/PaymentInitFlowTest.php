@@ -20,7 +20,7 @@ final class PaymentInitFlowTest extends TestCase
                 'address' => 'Dhaka',
                 'education' => 'primary',
                 'courier_help' => 'yes',
-                'nearest_courier' => 'Dhaka',
+                'nearest_courier' => '20',
                 'submitted' => true,
             ]);
 
@@ -40,6 +40,6 @@ final class PaymentInitFlowTest extends TestCase
         $paymentResponse->assertJsonPath('method', 'nagad');
         $this->assertStringContainsString('/payment/start', $paymentResponse->json('url'));
         $this->assertStringContainsString('reference_no', $paymentResponse->json('url'));
-        $this->assertStringContainsString('amount=99.00', $paymentResponse->json('url'));
+        $this->assertStringContainsString('amount=20.00', $paymentResponse->json('url'));
     }
 }

@@ -12,5 +12,5 @@ Broadcast::channel('lalcoin-applications', function ($user) {
     return $user !== null;
 });
 Broadcast::channel('all-applications', function ($user) {
-    return $user !== null;
+    return method_exists($user, 'isAdmin') && $user->isAdmin();
 });

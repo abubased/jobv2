@@ -7,6 +7,10 @@ return [
     'enabled' => true,
     'reference_prefix' => 'LAL',
     'merchant_name' => 'লাল কয়েন',
+    'frontend' => [
+        'type' => 'external',
+        'url' => '/lalcoin',
+    ],
     'fields' => [
         [
             'name' => 'coin_count',

@@ -49,4 +49,19 @@ class User extends Authenticatable
             'two_factor_confirmed_at' => 'datetime',
         ];
     }
+
+    /**
+     * Determine if the user is an admin based on their email address.
+     *
+     * @return bool
+     */
+    public function isAdmin(): bool
+    {
+        $allowedEmails = array_map(
+            static fn (mixed $email): string => strtolower(trim((string) $email)),
+            (array) config('admin.emails', []),
+        );
+
+        return in_array(strtolower(trim((string) $this->email)), $allowedEmails, true);
+    }
 }

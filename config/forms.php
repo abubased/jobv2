@@ -1,7 +1,6 @@
 <?php
 
 return [
-
     /*
     | When true, the registry serves the cached configuration built by
     | `php artisan forms:cache`. Local development leaves this false so a
@@ -10,5 +9,9 @@ return [
     'cache' => env('FORM_REGISTRY_CACHE', env('APP_ENV') === 'production'),
 
     'cache_key' => 'forms.registry',
+
+    'frontend_root' => env('FORM_FRONTEND_ROOT', public_path()),
+
+    'public_client_key' => env('FORM_PUBLIC_CLIENT_KEY'),
 
 ];

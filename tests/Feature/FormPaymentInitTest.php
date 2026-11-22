@@ -52,10 +52,10 @@ final class FormPaymentInitTest extends TestCase
         $job = $this->submit('job-application', [
             'education' => 'bachelor',
             'courier_help' => 'yes',
-            'nearest_courier' => '99',
+            'nearest_courier' => '20',
         ]);
         $jobPayment = $this->initialize($job, 'bkash', ['amount' => '20']);
-        $jobPayment->assertOk()->assertJsonPath('amount', '99.00');
+        $jobPayment->assertOk()->assertJsonPath('amount', '20.00');
         $this->assertSame(config('app.name'), $jobPayment->json('merchant_name'));
 
         $shohoj = $this->submit('shohojcash', [
