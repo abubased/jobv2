@@ -6,6 +6,21 @@ Public URL: `/forms/{slug}`
 
 Submission: `POST /submit-form`
 
+The body identifies the form with `form_slug` (`slug` is still accepted when it is the same value). Common columns are `name`, `phone`, and `address`. Form-specific answers go in `form_data`. Client `payment_amount`, `merchant_name`, `payment_reference`, and `payment_status` are ignored.
+
+A successful response is:
+
+```json
+{
+  "success": true,
+  "message": "আপনার আবেদন জমা হয়েছে।",
+  "application_id": 1,
+  "reference_no": "LAL-1-AB12CD34"
+}
+```
+
+The reference is `{prefix}-{id}-{random}` and is stored on the row before `ApplicationCreated` and the notification are sent. The merchant and fee are copied from the form configuration at the same time. Unknown and disabled slugs return `404`. The same phone may submit again.
+
 Payment start: `POST /init-payment`
 
 Admin list: `GET /all-applications` (authenticated)
@@ -43,7 +58,7 @@ No new controller, route, migration, table, or Vue file is required. `/forms/edu
 
 - `fixed` uses `payment_amount`.
 - `config` uses `key` (a `config()` key) and falls back to `payment_amount`.
-- `field` uses `field`. The value must be in `allowed`, or in that field's options when `allowed` is omitted. Anything else is rejected. `loanAmount` is not a fee.
+- `field` uses `field`. A `map` turns an allowed stored value into an amount. Without a map, the value must be in `allowed`, or in that field's options when `allowed` is omitted. Anything else is rejected. `loanAmount` is not a fee.
 
 `settings` keys the renderer understands:
 
@@ -51,7 +66,9 @@ No new controller, route, migration, table, or Vue file is required. `/forms/edu
 - `common_fields` labels, placeholders, and address `type`
 - `compose_address_from`: ordered form-data keys joined into `address` when the client does not send one
 
-Field keys: `name`, `label`, `type`, `placeholder`, `required`, `default`, `options`, `validation`, `help_text`, `section`, `order`.
+Field keys: `name`, `label`, `type`, `placeholder`, `required`, `default`, `options`, `validation`, `help_text`, `section`, `order`, `depends_on`.
+
+`depends_on` is `{field, value}` or `{field, values}`. The parent must be another field on the same form. While the parent value is outside that list, the dependent field is excluded from validation and from `form_data`. A required dependent field is required only when the parent matches. The shared renderer hides the field in that same case. `validation_rules` may also use Laravel conditional rules such as `required_if` when `depends_on` is omitted.
 
 Types: `text`, `email`, `number`, `tel`, `date`, `textarea`, `select`, `radio`, `checkbox`, `hidden`.
 
@@ -74,7 +91,11 @@ Job `nearest_courier` is still the registration fee. On `/forms/job-application`
 
 ShohojCash address is `road, thana, district, division`. `loanAmount` stays in `form_data`.
 
-Payment initialization signs the existing `apay-payment.start` URL (`GET /payment/start`). Account, PIN, and OTP screens are still the payment module. Those screens still attach follow-up data by the legacy `LAL-` / job reference lookup, so a `JOB-` or `LOAN-` reference is not written back onto `all_applications` by the current step controllers.
+Payment initialization signs `payment.start` (`GET /payment/start`) for 2,880 minutes. The `signed` middleware rejects a missing, altered, or expired signature before the payment session starts. Reusing an initialization returns the stored URL only while that signature is still valid. An expired URL is replaced with a new 48-hour URL; opening the link does not move its expiry. The fee comes from the form configuration: a fixed amount, a config value, an allow-list, or a `map` from a stored field value to an amount. Job `nearest_courier` maps `20` to `20.00` and `99` to `99.00`. ShohojCash uses `config('shohojcash.payment_amount')`, not `loanAmount`.
+
+`POST /init-payment` accepts `application_id` and `method`. The application must have been submitted in the same session. Client amount, merchant, reference, and status are ignored. `payment_status` is stored as `initiated`. A `paid` or `success` row is not initialized again. The lock key is `universal-payment-init:{id}`.
+
+Account, PIN, and OTP screens are still the payment module. Those screens still attach follow-up data by the legacy `LAL-` / job reference lookup, so a `JOB-` or `LOAN-` reference is not written back onto `all_applications` by the current step controllers.
 
 ## EducationLoan.php
 

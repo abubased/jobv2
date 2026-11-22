@@ -108,15 +108,22 @@ final class FormRegistryTest extends TestCase
             ],
         ]);
 
-        $response->assertOk();
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonStructure(['message', 'application_id', 'reference_no']);
 
         $application = Application::query()->first();
         $this->assertNotNull($application);
         $this->assertSame('lalcoin', $application->form_slug);
         $this->assertSame(['coin_count' => '100', 'coin_year' => '2026'], $application->form_data);
-        $this->assertNull($application->payment_amount);
-        $this->assertNull($application->merchant_name);
+        $this->assertSame('99.00', $application->payment_amount);
+        $this->assertSame('লাল কয়েন', $application->merchant_name);
+        $this->assertNull($application->payment_status);
+        $this->assertStringStartsWith('LAL-', (string) $application->payment_reference);
+        $this->assertSame($application->id, $response->json('application_id'));
+        $this->assertSame($application->payment_reference, $response->json('reference_no'));
         $this->assertSame(0, LalcoinApplication::query()->count());
+        $this->carrySessionCookies($response);
 
         $payment = $this->postJson('/init-payment', [
             'application_id' => $application->id,
@@ -127,7 +134,7 @@ final class FormRegistryTest extends TestCase
 
         $payment->assertOk();
         $this->assertStringContainsString('amount=99.00', $payment->json('url'));
-        $this->assertStringStartsWith('LAL-', (string) $payment->json('reference_no'));
+        $this->assertSame($application->payment_reference, $payment->json('reference_no'));
 
         $application->refresh();
         $this->assertSame('99.00', $application->payment_amount);
@@ -169,9 +176,15 @@ final class FormRegistryTest extends TestCase
             ],
         ]);
 
-        $accepted->assertOk();
+        $accepted->assertOk()
+            ->assertJsonStructure(['success', 'message', 'application_id', 'reference_no']);
 
         $application = Application::query()->firstOrFail();
+        $this->assertSame('20.00', $application->payment_amount);
+        $this->assertSame(config('app.name'), $application->merchant_name);
+        $this->assertStringStartsWith('JOB-', (string) $application->payment_reference);
+        $this->assertSame($application->payment_reference, $accepted->json('reference_no'));
+        $this->carrySessionCookies($accepted);
         $payment = $this->postJson('/init-payment', [
             'application_id' => $application->id,
             'method' => 'bkash',
@@ -180,7 +193,7 @@ final class FormRegistryTest extends TestCase
 
         $payment->assertOk();
         $this->assertSame('20.00', $payment->json('amount'));
-        $this->assertStringStartsWith('JOB-', (string) $payment->json('reference_no'));
+        $this->assertSame($application->payment_reference, $payment->json('reference_no'));
         $this->assertSame(config('app.name'), $payment->json('merchant_name'));
     }
 
@@ -207,10 +220,16 @@ final class FormRegistryTest extends TestCase
             ],
         ]);
 
-        $response->assertOk();
+        $response->assertOk()
+            ->assertJsonStructure(['success', 'message', 'application_id', 'reference_no']);
 
         $application = Application::query()->firstOrFail();
         $this->assertSame('Road 10, Uttara, Dhaka, ঢাকা', $application->address);
+        $this->assertSame('20.00', $application->payment_amount);
+        $this->assertSame(config('shohojcash.merchant_name'), $application->merchant_name);
+        $this->assertStringStartsWith('LOAN-', (string) $application->payment_reference);
+        $this->assertSame($application->payment_reference, $response->json('reference_no'));
+        $this->carrySessionCookies($response);
         $this->assertSame(50000, $application->form_data['loanAmount']);
         $this->assertArrayNotHasKey('consent', $application->form_data);
         $this->assertSame('shohojcash.online', $application->form_data['source']);
@@ -223,7 +242,7 @@ final class FormRegistryTest extends TestCase
 
         $payment->assertOk();
         $this->assertSame('20.00', $payment->json('amount'));
-        $this->assertStringStartsWith('LOAN-', (string) $payment->json('reference_no'));
+        $this->assertSame($application->payment_reference, $payment->json('reference_no'));
         $this->assertSame(0, LalcoinApplication::query()->count());
     }
 

@@ -6,11 +6,11 @@ use App\Events\JobApplicationCreated;
 use App\Helpers\MetaTagHelper;
 use App\Models\JobApplication;
 use App\Models\LalcoinApplication;
+use App\Modules\Payment\SignedPaymentUrl;
 use App\Notifications\NewJobApplicationNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Notification;
-use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 
@@ -25,6 +25,7 @@ class JobApplicationController extends Controller
             'applications' => JobApplication::latest()->paginate(20)->withQueryString(),
         ])->withViewData(MetaTagHelper::forApplications());
     }
+
     public function coinApplications()
     {
         return Inertia::render('LalcoinApplications/Index', [
@@ -33,8 +34,6 @@ class JobApplicationController extends Controller
                 ->withQueryString(),
         ]);
     }
-
-
 
     /**
      * Store a newly created job application
@@ -86,8 +85,6 @@ class JobApplicationController extends Controller
         ]);
     }
 
-
-
     public function initPayment(Request $request)
     {
         $validated = $request->validate([
@@ -108,7 +105,7 @@ class JobApplicationController extends Controller
         if (
             $application->payment_method === $validated['method'] &&
             $application->payment_reference &&
-            $application->payment_url
+            SignedPaymentUrl::isCurrent($application->payment_url)
         ) {
             return response()->json([
                 'success' => true,
@@ -125,7 +122,7 @@ class JobApplicationController extends Controller
         */
 
         $lock = Cache::lock(
-            'payment-init:' . $application->id,
+            'payment-init:'.$application->id,
             30
         );
 
@@ -149,7 +146,7 @@ class JobApplicationController extends Controller
             if (
                 $application->payment_method === $validated['method'] &&
                 $application->payment_reference &&
-                $application->payment_url
+                SignedPaymentUrl::isCurrent($application->payment_url)
             ) {
                 return response()->json([
                     'success' => true,
@@ -186,9 +183,9 @@ class JobApplicationController extends Controller
             */
 
             $referenceNo =
-                'REG-' .
-                $application->id .
-                '-' .
+                'REG-'.
+                $application->id.
+                '-'.
                 strtoupper(Str::random(8));
 
             /*
@@ -197,20 +194,17 @@ class JobApplicationController extends Controller
             |--------------------------------------------------------------------------
             */
 
-            $paymentUrl = URL::signedRoute(
-                'apay-payment.start',
-                [
-                    'reference_no' => $referenceNo,
-                    'amount' => $amount,
-                    'charge' => '0.00',
-                    'merchant_name' => config('app.name'),
+            $paymentUrl = SignedPaymentUrl::issue([
+                'reference_no' => $referenceNo,
+                'amount' => $amount,
+                'charge' => '0.00',
+                'merchant_name' => config('app.name'),
+                'method' => $validated['method'],
+                'return_url' => route('payment.callback', [
+                    'application_id' => $application->id,
                     'method' => $validated['method'],
-                    'return_url' => route('payment.callback', [
-                        'application_id' => $application->id,
-                        'method' => $validated['method'],
-                    ]),
-                ]
-            );
+                ]),
+            ]);
 
             /*
             |--------------------------------------------------------------------------
@@ -240,17 +234,13 @@ class JobApplicationController extends Controller
         }
     }
 
-
-
-
-
     // public function initPayment(Request $request)
     // {
     //     $validated = $request->validate([
     //         'application_id' => 'required|exists:job_applications,id',
     //         'method' => 'required|string|in:nagad,bkash,rocket,upay',
     //     ]);
-        
+
     //     $application = JobApplication::findOrFail($validated['application_id']);
 
     //     $methodName = match ($validated['method']) {
@@ -311,7 +301,7 @@ class JobApplicationController extends Controller
 
         return back()->with([
             'success' => true,
-            'message' => 'আবেদন সফলভাবে মুছে ফেলা হয়েছে!'
+            'message' => 'আবেদন সফলভাবে মুছে ফেলা হয়েছে!',
         ]);
     }
 }

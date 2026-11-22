@@ -7,6 +7,11 @@ interface FieldOption {
     label: string;
 }
 
+interface FieldDependency {
+    field: string;
+    values: Array<string | number>;
+}
+
 interface FormField {
     name: string;
     label: string;
@@ -18,6 +23,7 @@ interface FormField {
     help_text?: string | null;
     section?: string | null;
     order: number;
+    depends_on?: FieldDependency | null;
 }
 
 interface CommonField {
@@ -100,6 +106,14 @@ const csrfToken = () =>
 
 const fieldError = (name: string) => errors.value[name] || errors.value[`form_data.${name}`] || '';
 
+const isVisible = (field: FormField) => {
+    if (!field.depends_on) {
+        return true;
+    }
+
+    return field.depends_on.values.map(String).includes(String(formData[field.depends_on.field] ?? ''));
+};
+
 const applyErrors = (payload: { errors?: Record<string, string | string[]>; message?: string }) => {
     const next: Record<string, string> = {};
 
@@ -123,17 +137,22 @@ const submit = async () => {
     try {
         const response = await fetch('/submit-form', {
             method: 'POST',
+            credentials: 'same-origin',
             headers: {
                 'Content-Type': 'application/json',
                 Accept: 'application/json',
                 'X-CSRF-TOKEN': csrfToken(),
             },
             body: JSON.stringify({
-                slug: props.form.slug,
+                form_slug: props.form.slug,
                 name: common.name,
                 phone: common.phone,
                 address: composesAddress.value ? null : common.address,
-                form_data: { ...formData },
+                form_data: Object.fromEntries(
+                    props.form.fields
+                        .filter((field) => isVisible(field))
+                        .map((field) => [field.name, formData[field.name]]),
+                ),
             }),
         });
 
@@ -144,7 +163,7 @@ const submit = async () => {
             return;
         }
 
-        applicationId.value = result.application?.id ?? null;
+        applicationId.value = result.application_id ?? null;
         status.value = result.message;
 
         if (result.payment_enabled) {
@@ -168,6 +187,7 @@ const startPayment = async () => {
     try {
         const response = await fetch('/init-payment', {
             method: 'POST',
+            credentials: 'same-origin',
             headers: {
                 'Content-Type': 'application/json',
                 Accept: 'application/json',
@@ -264,12 +284,17 @@ const startPayment = async () => {
                 </label>
             </section>
 
-            <section v-for="[section, fields] in sections" :key="section" class="space-y-4">
+            <section
+                v-for="[section, fields] in sections"
+                v-show="fields.some(isVisible)"
+                :key="section"
+                class="space-y-4"
+            >
                 <h2 class="text-sm font-semibold uppercase tracking-wide text-[#6b7280]">
                     {{ section }}
                 </h2>
 
-                <div v-for="field in fields" :key="field.name">
+                <div v-for="field in fields" v-show="isVisible(field)" :key="field.name">
                     <input v-if="field.type === 'hidden'" type="hidden" :value="String(formData[field.name] ?? '')" />
 
                     <label v-else class="block text-sm">

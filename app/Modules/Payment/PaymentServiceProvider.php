@@ -2,9 +2,11 @@
 
 namespace App\Modules\Payment;
 
+use App\Modules\Payment\Http\Controllers\PaymentController;
 use App\Modules\Payment\Http\Middleware\EnsurePaymentSessionExists;
 use App\Modules\Payment\Support\GatewayManager;
 use Illuminate\Routing\Router;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
 class PaymentServiceProvider extends ServiceProvider
@@ -29,5 +31,9 @@ class PaymentServiceProvider extends ServiceProvider
             ->middleware('web')
             ->name(config('payment.route_name_prefix').'.')
             ->group(self::MODULE_PATH.'/routes/web.php');
+
+        Route::get('/'.trim((string) config('payment.route_prefix'), '/').'/start', [PaymentController::class, 'start'])
+            ->middleware(['web', 'signed'])
+            ->name(SignedPaymentUrl::ROUTE);
     }
 }

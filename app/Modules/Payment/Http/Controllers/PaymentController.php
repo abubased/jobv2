@@ -16,13 +16,14 @@ use Illuminate\View\View;
  */
 class PaymentController extends Controller
 {
-    public function __construct(private PaymentSession $session)
-    {
-    }
+    public function __construct(private PaymentSession $session) {}
 
     public function start(Request $request): RedirectResponse
     {
-        // Signature validity is enforced by the "signed" route middleware.
+        if (! $request->hasValidSignature()) {
+            abort(403);
+        }
+
         $this->session->forget();
         $this->session->put([
             'reference_no' => $request->query('reference_no'),
@@ -32,12 +33,11 @@ class PaymentController extends Controller
             'method' => $request->query('method'),
             'return_url' => $request->query('return_url'),
         ]);
-        
+
         $this->session->setStep('account-number');
 
         return redirect()->route('apay-payment.steps.account-number');
     }
-
 
     public function success(): View|RedirectResponse
     {

@@ -95,7 +95,10 @@ return [
     'payment_amount_source' => [
         'type' => 'field',
         'field' => 'nearest_courier',
-        'allowed' => ['20', '99'],
+        'map' => [
+            '20' => '20.00',
+            '99' => '99.00',
+        ],
     ],
     'accepted_payment_methods' => ['nagad', 'bkash', 'rocket', 'upay'],
     'merchant_notification_emails' => [],

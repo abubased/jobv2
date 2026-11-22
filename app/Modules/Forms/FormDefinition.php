@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Forms;
 
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class FormDefinition
@@ -139,11 +140,95 @@ class FormDefinition
 
         foreach ($this->fields() as $field) {
             $name = (string) $field['name'];
-            $rules['form_data.'.$name] = $this->config['validation_rules'][$name]
-                ?? ($field['validation'] ?? (($field['required'] ?? false) ? ['required'] : ['nullable']));
+            $rules['form_data.'.$name] = $this->rulesForField($field);
         }
 
         return $rules;
+    }
+
+    /**
+     * Configured rules, with depends_on applied as server-side conditional rules.
+     * A dependent value is excluded unless its parent matches, and a required
+     * dependent field is required only while that condition is true.
+     *
+     * @param  array<string, mixed>  $field
+     * @return list<mixed>
+     */
+    private function rulesForField(array $field): array
+    {
+        $name = (string) $field['name'];
+        $configured = $this->config['validation_rules'][$name] ?? ($field['validation'] ?? null);
+
+        if ($configured === null) {
+            $rules = ($field['required'] ?? false) ? ['required'] : ['nullable'];
+        } elseif (is_string($configured)) {
+            $rules = explode('|', $configured);
+        } else {
+            $rules = array_values($configured);
+        }
+
+        $dependency = $this->dependency($field);
+
+        if ($dependency === null) {
+            return $rules;
+        }
+
+        [$parent, $values] = $dependency;
+
+        $rules = array_values(array_filter(
+            $rules,
+            static fn (mixed $rule): bool => ! in_array($rule, ['required', 'nullable'], true)
+                && ! (is_string($rule) && (str_starts_with($rule, 'required_if:') || str_starts_with($rule, 'exclude_unless:'))),
+        ));
+
+        array_unshift(
+            $rules,
+            Rule::excludeIf(function () use ($parent, $values): bool {
+                return ! in_array(request()->input('form_data.'.$parent), $values, false);
+            }),
+            'nullable',
+        );
+
+        if (($field['required'] ?? false) === true) {
+            $rules[] = Rule::requiredIf(function () use ($parent, $values): bool {
+                return in_array(request()->input('form_data.'.$parent), $values, false);
+            });
+        }
+
+        return $rules;
+    }
+
+    /**
+     * @param  array<string, mixed>  $field
+     * @return array{0: string, 1: list<int|string>}|null
+     */
+    private function dependency(array $field): ?array
+    {
+        $depends = $field['depends_on'] ?? null;
+
+        if (! is_array($depends) || ! isset($depends['field']) || ! is_string($depends['field'])) {
+            return null;
+        }
+
+        $values = $depends['values'] ?? (array_key_exists('value', $depends) ? [$depends['value']] : []);
+
+        if (! is_array($values) || $values === []) {
+            return null;
+        }
+
+        $normalized = [];
+
+        foreach ($values as $value) {
+            if (is_int($value) || is_string($value)) {
+                $normalized[] = $value;
+            }
+        }
+
+        if ($normalized === []) {
+            return null;
+        }
+
+        return [$depends['field'], $normalized];
     }
 
     /**
@@ -220,8 +305,13 @@ class FormDefinition
         if ($type === 'field') {
             $field = (string) $source['field'];
             $value = $formData[$field] ?? null;
-            $allowed = $this->allowedAmounts($source, $field);
+            $mapped = $this->mappedAmount($source, $value);
 
+            if ($mapped !== null) {
+                return $mapped;
+            }
+
+            $allowed = $this->allowedAmounts($source, $field);
             $normalized = $this->formatAmount($value);
 
             if (! in_array($normalized, $allowed, true)) {
@@ -276,8 +366,27 @@ class FormDefinition
                 'help_text' => $field['help_text'] ?? null,
                 'section' => $field['section'] ?? null,
                 'order' => (int) ($field['order'] ?? 0),
+                'depends_on' => $this->publicDependency($field),
             ];
         }, $this->fields());
+    }
+
+    /**
+     * @param  array<string, mixed>  $field
+     * @return array{field: string, values: list<int|string>}|null
+     */
+    private function publicDependency(array $field): ?array
+    {
+        $dependency = $this->dependency($field);
+
+        if ($dependency === null) {
+            return null;
+        }
+
+        return [
+            'field' => $dependency[0],
+            'values' => $dependency[1],
+        ];
     }
 
     private function publicPaymentAmount(): ?string
@@ -294,6 +403,31 @@ class FormDefinition
         }
 
         return $this->formatAmount($this->config['payment_amount']);
+    }
+
+    /**
+     * Explicit value-to-amount map. The submitted value is a key, not the fee,
+     * unless that key is present and its mapped amount is numeric.
+     *
+     * @param  array<string, mixed>  $source
+     */
+    private function mappedAmount(array $source, mixed $value): ?string
+    {
+        $map = $source['map'] ?? null;
+
+        if (! is_array($map) || $map === [] || ! is_scalar($value)) {
+            return null;
+        }
+
+        $mapped = $map[(string) $value] ?? null;
+
+        if (! is_numeric($mapped)) {
+            throw ValidationException::withMessages([
+                'form_data.'.(string) $source['field'] => 'The registration fee is not an allowed amount.',
+            ]);
+        }
+
+        return $this->formatAmount($mapped);
     }
 
     /**

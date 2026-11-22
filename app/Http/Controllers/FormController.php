@@ -8,12 +8,12 @@ use App\Events\ApplicationCreated;
 use App\Models\Application;
 use App\Modules\Forms\FormDefinition;
 use App\Modules\Forms\FormRegistry;
+use App\Modules\Payment\SignedPaymentUrl;
 use App\Notifications\ApplicationSubmittedNotification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Notification;
-use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -36,7 +36,22 @@ class FormController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $form = $this->forms->find((string) $request->input('slug'));
+        $slug = $request->input('form_slug', $request->input('slug'));
+
+        if (! is_string($slug) || $slug === '') {
+            return response()->json([
+                'success' => false,
+                'message' => 'ফর্মটি পাওয়া যায়নি।',
+            ], 404);
+        }
+
+        if ($request->filled('form_slug') && $request->filled('slug') && $request->input('form_slug') !== $request->input('slug')) {
+            throw ValidationException::withMessages([
+                'form_slug' => 'ফর্ম শনাক্তকারী মিলছে না।',
+            ]);
+        }
+
+        $form = $this->forms->find($slug);
 
         if (! $form instanceof FormDefinition) {
             return response()->json([
@@ -44,6 +59,11 @@ class FormController extends Controller
                 'message' => 'ফর্মটি পাওয়া যায়নি।',
             ], 404);
         }
+
+        $request->merge([
+            'slug' => $form->slug(),
+            'form_slug' => $form->slug(),
+        ]);
 
         $this->blankStringsToNull($request, 'form_data');
 
@@ -65,8 +85,14 @@ class FormController extends Controller
             'phone' => $validated['phone'],
             'address' => $address,
             'form_data' => $formData,
+            'payment_amount' => $form->paymentEnabled() ? $form->resolvePaymentAmount($formData) : null,
+            'merchant_name' => $form->merchantName(),
             'submitted' => true,
         ]);
+
+        $referenceNo = $this->referenceNumber($form, $application->id);
+        $application->update(['payment_reference' => $referenceNo]);
+        $this->rememberApplication($request, $application);
 
         event(new ApplicationCreated($application));
         $this->notify($form, $application);
@@ -74,13 +100,9 @@ class FormController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'আপনার আবেদন জমা হয়েছে।',
+            'application_id' => $application->id,
+            'reference_no' => $referenceNo,
             'payment_enabled' => $form->paymentEnabled(),
-            'application' => [
-                'id' => $application->id,
-                'form_slug' => $application->form_slug,
-                'name' => $application->name,
-                'phone' => $application->phone,
-            ],
         ]);
     }
 
@@ -92,6 +114,7 @@ class FormController extends Controller
         ]);
 
         $application = Application::query()->findOrFail($validated['application_id']);
+        $this->authorizeApplication($request, $application);
         $form = $this->forms->find($application->form_slug);
 
         if (! $form instanceof FormDefinition || ! $form->paymentEnabled()) {
@@ -107,18 +130,17 @@ class FormController extends Controller
             ]);
         }
 
+        if ($this->paymentAlreadyCompleted($application)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'এই আবেদনের পেমেন্ট ইতিমধ্যে সম্পন্ন হয়েছে।',
+            ], 422);
+        }
+
         $amount = $form->resolvePaymentAmount($application->form_data ?? []);
         $merchantName = $form->merchantName();
 
-        if (
-            $application->payment_method === $validated['method']
-            && $application->payment_reference
-            && $application->payment_url
-        ) {
-            return $this->paymentPayload($application, $form, $amount, $merchantName);
-        }
-
-        $lock = Cache::lock('all-applications-payment-init:'.$application->id, 30);
+        $lock = Cache::lock('universal-payment-init:'.$application->id, 30);
 
         if (! $lock->get()) {
             return response()->json([
@@ -130,17 +152,24 @@ class FormController extends Controller
         try {
             $application->refresh();
 
+            if ($this->paymentAlreadyCompleted($application)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'এই আবেদনের পেমেন্ট ইতিমধ্যে সম্পন্ন হয়েছে।',
+                ], 422);
+            }
+
             if (
                 $application->payment_method === $validated['method']
-                && $application->payment_reference
-                && $application->payment_url
+                && SignedPaymentUrl::isCurrent($application->payment_url)
             ) {
                 return $this->paymentPayload($application, $form, $amount, $merchantName);
             }
 
-            $referenceNo = $form->referencePrefix().'-'.$application->id.'-'.strtoupper(Str::random(8));
+            $referenceNo = $application->payment_reference
+                ?: $this->referenceNumber($form, $application->id);
 
-            $paymentUrl = URL::signedRoute('apay-payment.start', [
+            $paymentUrl = SignedPaymentUrl::issue([
                 'reference_no' => $referenceNo,
                 'amount' => $amount,
                 'charge' => '0.00',
@@ -178,6 +207,37 @@ class FormController extends Controller
         ]);
     }
 
+    private function rememberApplication(Request $request, Application $application): void
+    {
+        $ids = array_map('intval', (array) $request->session()->get('universal_form_application_ids', []));
+        $ids[] = $application->id;
+
+        $request->session()->put('universal_form_application_ids', array_values(array_unique($ids)));
+    }
+
+    private function authorizeApplication(Request $request, Application $application): void
+    {
+        $ids = array_map('intval', (array) $request->session()->get('universal_form_application_ids', []));
+
+        if (! in_array($application->id, $ids, true)) {
+            abort(403);
+        }
+    }
+
+    private function paymentAlreadyCompleted(Application $application): bool
+    {
+        return in_array($application->payment_status, ['paid', 'success'], true);
+    }
+
+    private function referenceNumber(FormDefinition $form, int $id): string
+    {
+        do {
+            $reference = $form->referencePrefix().'-'.$id.'-'.strtoupper(Str::random(8));
+        } while (Application::query()->where('payment_reference', $reference)->exists());
+
+        return $reference;
+    }
+
     private function notify(FormDefinition $form, Application $application): void
     {
         $emails = $form->notificationEmails();
@@ -198,6 +258,7 @@ class FormController extends Controller
             'amount' => $amount,
             'merchant_name' => $merchantName,
             'reference_no' => $application->payment_reference,
+            'payment_status' => $application->payment_status,
             'url' => $application->payment_url,
             'form_slug' => $form->slug(),
         ]);

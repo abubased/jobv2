@@ -242,9 +242,58 @@ class FormConfigurationValidator
                     $this->validateOptions($name, $field['options'], $errors);
                 }
             }
+
+            $this->validateDependency($name, $field['depends_on'] ?? null, $errors);
+        }
+
+        foreach ($fields as $field) {
+            if (! is_array($field) || ! isset($field['name'], $field['depends_on']) || ! is_array($field['depends_on'])) {
+                continue;
+            }
+
+            $parent = $field['depends_on']['field'] ?? null;
+
+            if (is_string($parent) && ! in_array($parent, $names, true)) {
+                $errors[] = "Field [{$field['name']}] depends on unknown field [{$parent}].";
+            }
         }
 
         return $names;
+    }
+
+    /**
+     * @param  array<int, string>  $errors
+     */
+    private function validateDependency(string $name, mixed $depends, array &$errors): void
+    {
+        if ($depends === null) {
+            return;
+        }
+
+        if (! is_array($depends) || ! isset($depends['field']) || ! is_string($depends['field']) || $depends['field'] === '') {
+            $errors[] = "Field [{$name}] depends_on needs a field name.";
+
+            return;
+        }
+
+        if ($depends['field'] === $name) {
+            $errors[] = "Field [{$name}] cannot depend on itself.";
+        }
+
+        $values = $depends['values'] ?? (array_key_exists('value', $depends) ? [$depends['value']] : null);
+
+        if (! is_array($values) || $values === []) {
+            $errors[] = "Field [{$name}] depends_on needs a value or values list.";
+
+            return;
+        }
+
+        foreach ($values as $value) {
+            if (! is_int($value) && ! is_string($value)) {
+                $errors[] = "Field [{$name}] depends_on values must be strings or integers.";
+                break;
+            }
+        }
     }
 
     /**
@@ -283,11 +332,28 @@ class FormConfigurationValidator
         }
 
         $allowed = $source['allowed'] ?? null;
+        $map = $source['map'] ?? null;
+        $hasMap = false;
         $fieldConfig = collect($config['fields'])->firstWhere('name', $field);
         $optionValues = is_array($fieldConfig) ? $this->optionValues($fieldConfig) : [];
 
-        if ((! is_array($allowed) || $allowed === []) && $optionValues === []) {
-            $errors[] = 'A field payment amount needs an allow-list or field options. The submitted value is never used unless it matches that server-side list.';
+        if (isset($source['map']) && ! is_array($map)) {
+            $errors[] = 'Payment amount map must be an array.';
+        }
+
+        if (is_array($map) && $map !== []) {
+            $hasMap = true;
+
+            foreach ($map as $from => $amount) {
+                if ((! is_string($from) && ! is_int($from)) || ! is_numeric($amount)) {
+                    $errors[] = 'Payment amount map must use string or integer keys and numeric amounts.';
+                    break;
+                }
+            }
+        }
+
+        if (! $hasMap && (! is_array($allowed) || $allowed === []) && $optionValues === []) {
+            $errors[] = 'A field payment amount needs a map, an allow-list, or field options. The submitted value is never used unless it matches that server-side rule.';
         }
     }
 

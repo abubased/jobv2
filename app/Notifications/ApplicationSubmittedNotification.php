@@ -31,7 +31,8 @@ class ApplicationSubmittedNotification extends Notification
             ->line('নাম: '.$this->application->name)
             ->line('ফোন: '.$this->application->phone)
             ->line('ঠিকানা: '.$this->application->address)
-            ->line('আবেদন নম্বর: '.$this->application->id);
+            ->line('আবেদন নম্বর: '.$this->application->id)
+            ->line('রেফারেন্স: '.(string) $this->application->payment_reference);
 
         foreach ($this->application->form_data ?? [] as $key => $value) {
             if (is_scalar($value) || $value === null) {
