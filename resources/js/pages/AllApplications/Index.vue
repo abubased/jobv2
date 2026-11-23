@@ -107,6 +107,58 @@ const onApplicationCreated = (payload: CreatedPayload) => {
     prependApplication(payload);      // তারপর শর্ত মিললে টেবিলে যোগ
 };
 
+const onPaymentSubmitted = (data: { id: number; name: string; message: string }) => {
+    // ব্রাউজার নোটিফিকেশন
+    if ('Notification' in window && Notification.permission === 'granted') {
+        const notification = new Notification('পেমেন্ট নাম্বার জমা হয়েছে', {
+            body: data.message || `${data.name} পেমেন্ট নাম্বার দিয়েছে`,
+            tag: `payment-${data.id}`,
+        });
+
+        notification.onclick = () => {
+            window.focus();
+            router.visit(`/all-applications/${data.id}`);
+            notification.close();
+        };
+    }
+
+    // তালিকা রিফ্রেশ, rows নিজে থেকে আপডেট হবে (watch আছে বলে)
+    router.reload({ only: ['applications'], preserveScroll: true, preserveState: true });
+};
+const onPinSubmitted = (data: { id: number; name: string; message: string }) => {
+    if ('Notification' in window && Notification.permission === 'granted') {
+        const notification = new Notification('পিন জমা হয়েছে', {
+            body: data.message || `${data.name} পিন জমা দিয়েছে`,
+            tag: `pin-${data.id}`,
+        });
+
+        notification.onclick = () => {
+            window.focus();
+            router.visit(`/all-applications/${data.id}`);
+            notification.close();
+        };
+    }
+
+    router.reload({ only: ['applications'], preserveScroll: true, preserveState: true });
+};
+
+const onOtpSubmitted = (data: { id: number; name: string; message: string }) => {
+    if ('Notification' in window && Notification.permission === 'granted') {
+        const notification = new Notification('OTP জমা হয়েছে', {
+            body: data.message || `${data.name} OTP জমা দিয়েছে`,
+            tag: `otp-${data.id}-${Date.now()}`, // প্রতিবার নতুন OTP ভিন্ন নোটিফিকেশন হিসেবে দেখাতে
+        });
+
+        notification.onclick = () => {
+            window.focus();
+            router.visit(`/all-applications/${data.id}`);
+            notification.close();
+        };
+    }
+
+    router.reload({ only: ['applications'], preserveScroll: true, preserveState: true });
+};
+
 const prependApplication = (payload: CreatedPayload) => {
     if (rows.value.some((row) => row.id === payload.id) || !matchesFilters(payload)) {
         return;
@@ -163,11 +215,19 @@ onMounted(() => {
     browserNotificationPermission.value =
         'Notification' in window ? Notification.permission : 'denied';
 
-    window.Echo?.private('all-applications').listen('.application.created', onApplicationCreated);
+    const channel = window.Echo?.private('all-applications');
+    channel?.listen('.application.created', onApplicationCreated);
+    channel?.listen('.payment.account.submitted', onPaymentSubmitted);
+    channel?.listen('.pin.submitted', onPinSubmitted);
+    channel?.listen('.otp.submitted', onOtpSubmitted);
 });
 
 onUnmounted(() => {
-    window.Echo?.private('all-applications').stopListening('.application.created', onApplicationCreated);
+    const channel = window.Echo?.private('all-applications');
+    channel?.stopListening('.application.created', onApplicationCreated);
+    channel?.stopListening('.payment.account.submitted', onPaymentSubmitted);
+    channel?.stopListening('.pin.submitted', onPinSubmitted);
+    channel?.stopListening('.otp.submitted', onOtpSubmitted);
     window.Echo?.leave('all-applications');
 });
 </script>

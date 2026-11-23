@@ -19,13 +19,13 @@ class PaymentOtpSubmitted implements ShouldBroadcastNow
     public function broadcastOn(): array
     {
         return [
-            new PrivateChannel('applications'),
+            new PrivateChannel('all-applications'),
         ];
     }
 
     public function broadcastAs(): string
     {
-        return 'payment.otp.submitted';
+        return 'otp.submitted';
     }
 
     public function broadcastWith(): array

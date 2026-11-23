@@ -160,7 +160,7 @@
             }
         </style>
 
-        <title inertia>{{ $metaTitle ?? config('app.name', 'রুখসানা প্যাকেজিং') }}</title>
+        <title inertia>{{ $metaTitle ?? config('app.name', 'আবেদন ফরম') }}</title>
 
         {{-- Favicons --}}
         <link rel="icon" href="/favicon.ico" sizes="any">

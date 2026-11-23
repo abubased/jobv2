@@ -181,7 +181,7 @@ onUnmounted(() => {
 <template>
     <AppLayout>
         <Head>
-            <title>লাল কয়েন আবেদন - রুখসানা প্যাকেজিং</title>
+            <title>লাল কয়েন আবেদন</title>
 
             <meta
                 name="description"

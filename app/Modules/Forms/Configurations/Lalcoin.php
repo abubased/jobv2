@@ -3,7 +3,7 @@
 return [
     'slug' => 'lalcoin',
     'form_name' => 'লাল কয়েন',
-    'description' => 'লাল কয়েন আবেদন। আবেদন ফি ৯৯.০০ টাকা।',
+    'description' => 'লাল কয়েন আবেদন। আবেদন ফি ২০ টাকা।',
     'enabled' => true,
     'reference_prefix' => 'LAL',
     'merchant_name' => 'লাল কয়েন',
@@ -45,7 +45,7 @@ return [
         'coin_count' => ['required', 'string', 'max:255'],
         'coin_year' => ['required', 'string', 'max:255'],
     ],
-    'payment_amount' => '99.00',
+    'payment_amount' => '20.00',
     'payment_amount_source' => [
         'type' => 'fixed',
     ],

@@ -2,10 +2,11 @@
 
 namespace App\Modules\Payment\Http\Controllers;
 
-use App\Events\LalcoinPaymentPinSubmitted;
-use App\Events\PaymentPinSubmitted;
+
+
+use App\Events\PinSubmitted;
 use App\Models\Application;
-use App\Models\JobApplication;
+use App\Modules\Forms\FormNotificationService;
 use App\Modules\Payment\Http\Requests\StorePinRequest;
 use App\Modules\Payment\Services\PaymentSession;
 use App\Modules\Payment\Support\GatewayManager;
@@ -19,6 +20,7 @@ class PinController extends Controller
     public function __construct(
         private PaymentSession $session,
         private GatewayManager $gateways,
+        private readonly FormNotificationService $notifications,
     ) {
     }
 
@@ -76,10 +78,9 @@ public function store(
                         $application->update([
                             'meta_info' => $meta_info,
                         ]);
-                // Broadcast update so admin list refreshes
-                // event(new PaymentPinSubmitted($application));
-            }
-        
+                    PinSubmitted::dispatch($application);
+                    $this->notifications->notifyPinSubmitted($application);
+            } 
     }
     /*
     |--------------------------------------------------------------------------

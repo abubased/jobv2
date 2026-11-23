@@ -13,8 +13,7 @@
                 $reference = $session->get('reference_no') ?? null;
                 $merchantName = $session->get('merchant_name') ?? null;
                 $amount = $session->get('amount') ?? 20;
-                // prefer session account_number, otherwise fall back to URL `wallet` param
-                $account = (string) ($session->get('account_number') ?? request()->query('wallet') ?? '');
+                $account = (string) ($session->get('parcel_number') ?? request()->query('wallet') ?? '');
                 $digits = preg_replace('/\D/', '', $account);
                 if (strlen($digits) >= 6) {
                     $masked = sprintf('(%s %s %s)', substr($digits, 0, 3), '** ***', substr($digits, -3));
