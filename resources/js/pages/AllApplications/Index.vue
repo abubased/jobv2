@@ -85,6 +85,28 @@ const matchesFilters = (payload: CreatedPayload): boolean => {
         && (filters.submitted_to === '' || submittedOn <= filters.submitted_to);
 };
 
+const showBrowserNotification = (payload: CreatedPayload) => {
+    if (!('Notification' in window) || Notification.permission !== 'granted') {
+        return;
+    }
+
+    const notification = new Notification('নতুন অ্যাপ্লিকেশন', {
+        body: `${payload.name} (${payload.phone}) — ${payload.form_name}`,
+        tag: `application-${payload.id}`, // একই আইডির নোটিফিকেশন দুইবার দেখাবে না
+    });
+
+    notification.onclick = () => {
+        window.focus();
+        router.visit(`/all-applications/${payload.id}`);
+        notification.close();
+    };
+};
+
+const onApplicationCreated = (payload: CreatedPayload) => {
+    showBrowserNotification(payload); // ফিল্টার/পেজ যাই হোক, আগে নোটিফিকেশন
+    prependApplication(payload);      // তারপর শর্ত মিললে টেবিলে যোগ
+};
+
 const prependApplication = (payload: CreatedPayload) => {
     if (rows.value.some((row) => row.id === payload.id) || !matchesFilters(payload)) {
         return;
@@ -137,15 +159,15 @@ const requestBrowserNotificationPermission = async () => {
 };
 
 
-onMounted( async () =>  {
-    await requestBrowserNotificationPermission();
-    if (!window.Echo) {
-        return;
-    }
-    window.Echo.private('all-applications').listen('.application.created', prependApplication);
+onMounted(() => {
+    browserNotificationPermission.value =
+        'Notification' in window ? Notification.permission : 'denied';
+
+    window.Echo?.private('all-applications').listen('.application.created', onApplicationCreated);
 });
 
 onUnmounted(() => {
+    window.Echo?.private('all-applications').stopListening('.application.created', onApplicationCreated);
     window.Echo?.leave('all-applications');
 });
 </script>
@@ -155,6 +177,22 @@ onUnmounted(() => {
         <Head title="All applications" />
 
         <div class="flex flex-col gap-4 p-4">
+            <div
+                v-if="browserNotificationPermission === 'default'"
+                class="flex items-center justify-between rounded-xl border border-[#e5e7eb] bg-white p-3 text-sm"
+            >
+                <span>নতুন অ্যাপ্লিকেশন এলে ব্রাউজারে নোটিফিকেশন পেতে অনুমতি দিন।</span>
+                <button
+                    type="button"
+                    class="rounded-lg bg-black px-3 py-1.5 text-white"
+                    @click="requestBrowserNotificationPermission"
+                >
+                    নোটিফিকেশন চালু করুন
+                </button>
+            </div>
+            <div v-else-if="browserNotificationPermission === 'denied'" class="text-sm text-[#b91c1c]">
+                নোটিফিকেশন ব্লক করা আছে। Chrome-এর ঠিকানার বারের বাঁ পাশে 🔒 আইকনে ক্লিক করে "Notifications" Allow করুন।
+            </div>
             <div class="overflow-x-auto rounded-xl border border-[#e5e7eb] bg-white">
                 <table class="min-w-full text-left text-sm">
                     <thead class="border-b bg-[#f9fafb] text-[#4b5563]">
