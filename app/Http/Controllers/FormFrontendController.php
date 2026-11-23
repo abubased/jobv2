@@ -45,7 +45,7 @@ class FormFrontendController extends Controller
             abort(404);
         }
 
-        return $this->serveFile($file);
+        return $this->serveEntry($file, $slug);
     }
 
     public function asset(string $slug, ?string $path = null): Response|BinaryFileResponse
@@ -67,7 +67,7 @@ class FormFrontendController extends Controller
             abort(404);
         }
 
-        return $this->serveFile($file);
+       return $this->serveEntry($file, $slug);
     }
 
     private function redirectToFrontend(string $url): RedirectResponse
@@ -213,6 +213,26 @@ class FormFrontendController extends Controller
         ], true);
     }
 
+    private function serveEntry(string $file, string $slug): Response|BinaryFileResponse
+    {
+        if (! str_ends_with(strtolower($file), '.html')) {
+            return $this->serveFile($file);
+        }
+
+        $html = file_get_contents($file);
+        $base = '<base href="' . e('/forms/' . $slug . '/') . '">';
+
+        // পেজে আগে থেকে base ট্যাগ থাকলে বাদ দিন
+        if (! preg_match('/<base\s/i', $html)) {
+            $html = preg_replace('/<head([^>]*)>/i', '<head$1>' . $base, $html, 1);
+        }
+
+        return response($html, 200, [
+            'Content-Type'           => 'text/html; charset=UTF-8',
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control'          => 'no-cache',
+        ]);
+    }
     private function serveFile(string $file): BinaryFileResponse
     {
         $response = response()->file($file);

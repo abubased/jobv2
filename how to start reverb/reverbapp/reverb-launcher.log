@@ -1,0 +1,102 @@
+[2026-11-23T11:02:10.981Z] Reverb চালু হয়েছে: PID 3618194, PHP 8.3.37 (/opt/cpanel/ea-php83/root/usr/bin/php)
+
+   INFO  Starting server on 127.0.0.1:8080 (submit-now.online).  
+
+[2026-11-23T11:02:11.499Z] স্টার্টআপ চেক: {"running":true,"started":true,"pid":3618194}
+   INFO  Gracefully terminating connections.  
+
+[2026-11-23T11:03:41.532Z] Reverb চালু হয়েছে: PID 3623045, PHP 8.3.37 (/opt/cpanel/ea-php83/root/usr/bin/php)
+
+   INFO  Starting server on 127.0.0.1:8080 (submit-now.online).  
+
+[2026-11-23T11:03:42.035Z] স্টার্টআপ চেক: {"running":true,"started":true,"pid":3623045}
+   INFO  Gracefully terminating connections.  
+
+[2026-11-23T11:09:37.321Z] Reverb চালু হয়েছে: PID 3644722, PHP 8.3.37 (/opt/cpanel/ea-php83/root/usr/bin/php)
+
+   INFO  Starting server on 127.0.0.1:8080 (submit-now.online).  
+
+[2026-11-23T11:09:37.824Z] স্টার্টআপ চেক: {"running":true,"started":true,"pid":3644722}
+   INFO  Gracefully terminating connections.  
+
+[2026-11-23T11:11:25.939Z] Reverb চালু হয়েছে: PID 3650571, PHP 8.3.37 (/opt/cpanel/ea-php83/root/usr/bin/php)
+
+   INFO  Starting server on 127.0.0.1:8080 (submit-now.online).  
+
+   INFO  Gracefully terminating connections.  
+
+[2026-11-23T11:11:26.356Z] Reverb চালু হয়েছে: PID 3650631, PHP 8.3.37 (/opt/cpanel/ea-php83/root/usr/bin/php)
+
+   INFO  Starting server on 127.0.0.1:8080 (submit-now.online).  
+
+[2026-11-23T11:11:26.859Z] স্টার্টআপ চেক: {"running":true,"started":true,"pid":3650631}
+   INFO  Gracefully terminating connections.  
+
+[2026-11-23T11:12:26.061Z] Reverb চালু হয়েছে: PID 3653779, PHP 8.3.37 (/opt/cpanel/ea-php83/root/usr/bin/php)
+
+   INFO  Starting server on 127.0.0.1:8080 (submit-now.online).  
+
+[2026-11-23T11:12:26.565Z] স্টার্টআপ চেক: {"running":true,"started":true,"pid":3653779}
+   INFO  Gracefully terminating connections.  
+
+[2026-11-23T11:12:27.037Z] Reverb চালু হয়েছে: PID 3653917, PHP 8.3.37 (/opt/cpanel/ea-php83/root/usr/bin/php)
+
+   INFO  Starting server on 127.0.0.1:8080 (submit-now.online).  
+
+[2026-11-23T11:12:27.540Z] স্টার্টআপ চেক: {"running":true,"started":true,"pid":3653917}
+   INFO  Gracefully terminating connections.  
+
+[2026-11-23T11:12:40.504Z] Reverb চালু হয়েছে: PID 3654451, PHP 8.3.37 (/opt/cpanel/ea-php83/root/usr/bin/php)
+
+   INFO  Starting server on 127.0.0.1:8080 (submit-now.online).  
+
+[2026-11-23T11:12:41.007Z] স্টার্টআপ চেক: {"running":true,"started":true,"pid":3654451}
+   INFO  Gracefully terminating connections.  
+
+[2026-11-23T11:12:41.760Z] Reverb চালু হয়েছে: PID 3654527, PHP 8.3.37 (/opt/cpanel/ea-php83/root/usr/bin/php)
+
+   INFO  Starting server on 127.0.0.1:8080 (submit-now.online).  
+
+[2026-11-23T11:12:42.264Z] স্টার্টআপ চেক: {"running":true,"started":true,"pid":3654527}
+   INFO  Gracefully terminating connections.  
+
+[2026-11-23T11:14:12.301Z] Reverb চালু হয়েছে: PID 3661122, PHP 8.3.37 (/opt/cpanel/ea-php83/root/usr/bin/php)
+
+   INFO  Starting server on 127.0.0.1:8080 (submit-now.online).  
+
+[2026-11-23T11:14:12.806Z] স্টার্টআপ চেক: {"running":true,"started":true,"pid":3661122}
+   INFO  Gracefully terminating connections.  
+
+[2026-11-23T11:15:36.501Z] Reverb চালু হয়েছে: PID 3666135, PHP 8.3.37 (/opt/cpanel/ea-php83/root/usr/bin/php)
+
+   INFO  Starting server on 127.0.0.1:8080 (submit-now.online).  
+
+[2026-11-23T11:15:37.005Z] স্টার্টআপ চেক: {"running":true,"started":true,"pid":3666135}
+   INFO  Gracefully terminating connections.  
+
+[2026-11-23T11:15:48.870Z] Reverb চালু হয়েছে: PID 3666627, PHP 8.3.37 (/opt/cpanel/ea-php83/root/usr/bin/php)
+
+   INFO  Starting server on 127.0.0.1:8080 (submit-now.online).  
+
+[2026-11-23T11:15:49.374Z] স্টার্টআপ চেক: {"running":true,"started":true,"pid":3666627}
+   INFO  Gracefully terminating connections.  
+
+[2026-11-23T11:17:03.037Z] Reverb চালু হয়েছে: PID 3670063, PHP 8.3.37 (/opt/cpanel/ea-php83/root/usr/bin/php)
+
+   INFO  Starting server on 127.0.0.1:8080 (submit-now.online).  
+
+[2026-11-23T11:17:03.541Z] স্টার্টআপ চেক: {"running":true,"started":true,"pid":3670063}
+   INFO  Gracefully terminating connections.  
+
+[2026-11-23T11:20:24.881Z] Reverb চালু হয়েছে: PID 3681556, PHP 8.3.37 (/opt/cpanel/ea-php83/root/usr/bin/php)
+
+   INFO  Starting server on 127.0.0.1:8080 (submit-now.online).  
+
+[2026-11-23T11:20:25.385Z] স্টার্টআপ চেক: {"running":true,"started":true,"pid":3681556}
+   INFO  Gracefully terminating connections.  
+
+[2026-11-23T11:20:26.430Z] Reverb চালু হয়েছে: PID 3681649, PHP 8.3.37 (/opt/cpanel/ea-php83/root/usr/bin/php)
+
+   INFO  Starting server on 127.0.0.1:8080 (submit-now.online).  
+
+[2026-11-23T11:20:26.933Z] স্টার্টআপ চেক: {"running":true,"started":true,"pid":3681649}

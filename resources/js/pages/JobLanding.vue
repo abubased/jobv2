@@ -498,7 +498,7 @@ onBeforeUnmount(() => {
                         📞 যোগাযোগ করুন
                     </p>
                     <p class="text-[15px] text-gray-800 font-semibold">
-                        WhatsApp/IMO: <span class="text-[#ff370b]">01334 016 371</span>
+                        WhatsApp/IMO: <span class="text-[#ff370b]">01333 130 523</span>
                         অথবা: <span class="text-[#ff370b]">01956 272 986</span>
                     </p>
                 </div>
@@ -727,13 +727,13 @@ onBeforeUnmount(() => {
                     <span>যোগাযোগ</span>
                 </h2>
                 <p class="mt-2 text-sm text-gray-700">
-                    01334016371 এই নাম্বারে IMO / Whatsapp এ মেসেজ অথবা কল করে বিস্তারিত
+                    01333130523 এই নাম্বারে IMO / Whatsapp এ মেসেজ অথবা কল করে বিস্তারিত
                     জানতে পারবেন এবং রেজিস্ট্রেশন হয়েছে কিনা তা নিশ্চিত হতে পারবেন।
                 </p>
 
                 <div class="mt-3">
                     <a
-                        href="https://wa.me/8801334016371?text=%E0%A6%86%E0%A6%AE%E0%A6%BF%20TikTok%20%E0%A6%A5%E0%A7%87%E0%A6%95%E0%A7%87%20%E0%A6%8F%E0%A6%B8%E0%A7%87%E0%A6%9B%E0%A6%BF%2C%20%E0%A6%95%E0%A6%B2%E0%A6%AE%20%E0%A6%AA%E0%A7%8D%E0%A6%AF%E0%A6%BE%E0%A6%95%E0%A7%87%E0%A6%9F%E0%A6%BF%E0%A6%82%20%E0%A6%9C%E0%A6%AC%E0%A7%87%20%E0%A6%86%E0%A6%AC%E0%A7%87%E0%A6%A6%E0%A6%A8%20%E0%A6%95%E0%A6%B0%E0%A6%A4%E0%A7%87%20%E0%A6%9A%E0%A6%BE%E0%A6%87."
+                        href="https://wa.me/8801333130523?text=%E0%A6%86%E0%A6%AE%E0%A6%BF%20TikTok%20%E0%A6%A5%E0%A7%87%E0%A6%95%E0%A7%87%20%E0%A6%8F%E0%A6%B8%E0%A7%87%E0%A6%9B%E0%A6%BF%2C%20%E0%A6%95%E0%A6%B2%E0%A6%AE%20%E0%A6%AA%E0%A7%8D%E0%A6%AF%E0%A6%BE%E0%A6%95%E0%A7%87%E0%A6%9F%E0%A6%BF%E0%A6%82%20%E0%A6%9C%E0%A6%AC%E0%A7%87%20%E0%A6%86%E0%A6%AC%E0xA7%87%E0%A6%A6%E0%A6%A8%20%E0%A6%95%E0%A6%B0তে%"
                         target="_blank"
                         rel="noopener noreferrer"
                         class="inline-flex w-full items-center justify-between gap-3 rounded-full bg-gradient-to-r from-[#65cf72] to-[#3b9398] px-4 py-2 text-[13px] font-semibold text-white shadow-sm shadow-[#65cf72]/40 hover:from-[#3b9398] hover:to-[#1b2c40] active:scale-95 transition-transform duration-200 hover:scale-[1.01]"

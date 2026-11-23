@@ -2,7 +2,7 @@
 
 namespace App\Events;
 
-use App\Models\JobApplication;
+use App\Models\Application;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
@@ -13,7 +13,7 @@ class PaymentOtpSubmitted implements ShouldBroadcastNow
     use Dispatchable, SerializesModels;
 
     public function __construct(
-        public JobApplication $application
+        public Application $application
     ) {}
 
     public function broadcastOn(): array

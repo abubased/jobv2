@@ -64,9 +64,10 @@ Route::post('/submit-form', [FormController::class, 'store'])
 Route::post('/init-payment', [FormController::class, 'initPayment'])
     ->middleware(['throttle:30,1', 'form-api-client'])
     ->name('forms.init-payment');
-Route::get('/all-applications', [FormController::class, 'index'])
-    ->middleware(['auth', 'admin'])
-    ->name('all-applications.index');
+Route::middleware(['auth', 'admin'])->group(function () {
+    Route::get('/all-applications', [FormController::class, 'index'])->name('all-applications.index');
+    Route::get('/all-applications/{application}', [FormController::class, 'show'])->name('all-applications.show');
+});
 
 Route::get('dashboard', function () {
     return Inertia::render('Dashboard');

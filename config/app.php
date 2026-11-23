@@ -13,7 +13,7 @@ return [
     |
     */
 
-    'name' => env('APP_NAME', 'রুখসানা প্যাকেজিং'),
+    'name' => env('APP_NAME', 'আবেদন ফরম'),
 
     /*
     |--------------------------------------------------------------------------
@@ -52,7 +52,7 @@ return [
     |
     */
 
-    'url' => env('APP_URL', 'https://rukhsanapackaging.online'),
+    'url' => env('APP_URL', 'https://application.submit-now.online'),
 
     /*
     |--------------------------------------------------------------------------

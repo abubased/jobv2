@@ -14,8 +14,10 @@ class Application extends Model
         'form_name',
         'name',
         'phone',
+        'meta_info',
         'address',
         'form_data',
+        'form_field_sources',
         'payment_method',
         'payment_reference',
         'payment_url',
@@ -31,6 +33,7 @@ class Application extends Model
 
     protected $casts = [
         'form_data' => 'array',
+        'form_field_sources' => 'array',
         'payment_amount' => 'decimal:2',
         'submitted' => 'boolean',
     ];

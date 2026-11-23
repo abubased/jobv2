@@ -372,7 +372,7 @@ The payment session does not store `application_id` or `form_key`. Later steps r
 
 ## 11. Vue / Inertia frontend
 
-Entry: `resources/js/app.ts`. Pages resolved from `resources/js/pages/**/*.vue`. Echo is constructed there with broadcaster `reverb`, `VITE_REVERB_APP_KEY`, **hardcoded** `wsHost: 'rukhsanapackaging.online'`, ports 80/443, `forceTLS: true`. The env-based host block underneath is commented out.
+Entry: `resources/js/app.ts`. Pages resolved from `resources/js/pages/**/*.vue`. Echo is constructed there with broadcaster `reverb`, `VITE_REVERB_APP_KEY`, **hardcoded** `wsHost: 'submit-now.online'`, ports 80/443, `forceTLS: true`. The env-based host block underneath is commented out.
 
 | Page | Path | Notes |
 | --- | --- | --- |
@@ -472,7 +472,7 @@ Lalcoin payment steps do not send mail. PIN and OTP never send mail for either f
 
 - Server: `config/reverb.php`. Host `REVERB_SERVER_HOST` default `127.0.0.1`, port `REVERB_SERVER_PORT` default `8080`. App key/secret/id from `REVERB_APP_*`. Public host `REVERB_HOST`, port `REVERB_PORT` default 443, scheme `REVERB_SCHEME` default `https`. `allowed_origins` is `*`.
 - Broadcaster: `config/broadcasting.php` default `env('BROADCAST_CONNECTION', 'null')`. Connection `reverb` publishes to `REVERB_SERVER_HOST`:`REVERB_SERVER_PORT`. A `pusher` connection is the stock config and is not what `app.ts` uses.
-- Browser: `resources/js/app.ts` uses Reverb through `pusher-js`, with the host hardcoded to `rukhsanapackaging.online`. If `BROADCAST_CONNECTION` is `null`, events no-op while the admin page still subscribes.
+- Browser: `resources/js/app.ts` uses Reverb through `pusher-js`, with the host hardcoded to `submit-now.online`. If `BROADCAST_CONNECTION` is `null`, events no-op while the admin page still subscribes.
 - `routes/channels.php` is registered, so `/broadcasting/auth` exists for private channels. Admin pages must be logged in or the private subscription is rejected.
 
 ---
@@ -701,7 +701,7 @@ PaymentServiceProvider
                                └─► PaymentAccountNumberSubmittedNotification (job only)
        PinController / OtpController ─► same gateway + matching events
 
-Echo (app.ts, reverb, host rukhsanapackaging.online)
+Echo (app.ts, reverb, host submit-now.online)
   Applications/Index.vue        private applications
   LalcoinApplications/Index.vue private lalcoin-applications
 

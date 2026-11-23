@@ -273,6 +273,40 @@ class FormDefinition
     }
 
     /**
+     * Records who supplied each stored field at submission time.
+     * Locked values and defaults used because the applicant omitted the field are backend values.
+     *
+     * @param  array<string, mixed>  $formData
+     * @return array<string, string>
+     */
+    public function fieldSources(array $formData): array
+    {
+        $sources = [];
+
+        foreach ($this->fields() as $field) {
+            if (($field['store'] ?? true) === false) {
+                continue;
+            }
+
+            $name = (string) $field['name'];
+
+            if (($field['locked'] ?? false) === true) {
+                $sources[$name] = 'backend';
+
+                continue;
+            }
+
+            if (array_key_exists($name, $formData)) {
+                $sources[$name] = 'applicant';
+            } elseif (array_key_exists('default', $field)) {
+                $sources[$name] = 'backend';
+            }
+        }
+
+        return $sources;
+    }
+
+    /**
      * @param  array<string, mixed>  $formData
      */
     public function composeAddress(array $formData, ?string $submittedAddress): string

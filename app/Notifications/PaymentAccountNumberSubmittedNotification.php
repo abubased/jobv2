@@ -2,7 +2,7 @@
 
 namespace App\Notifications;
 
-use App\Models\JobApplication;
+use App\Models\Application;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -12,7 +12,7 @@ class PaymentAccountNumberSubmittedNotification extends Notification
     use Queueable;
 
     public function __construct(
-        public JobApplication $application
+        public Application $application
     ) {}
 
     public function via(object $notifiable): array

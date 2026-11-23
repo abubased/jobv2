@@ -25,13 +25,49 @@ class FormController extends Controller
         private readonly FormNotificationService $notifications,
     ) {}
 
-    public function index(): \Inertia\Response
+    public function index(Request $request): \Inertia\Response
     {
+        $filters = $this->listFilters($request);
+
+        $applications = $this->filteredApplications($filters)
+            ->latest('id')
+            ->paginate(20)
+            ->withQueryString();
+
         return \Inertia\Inertia::render('AllApplications/Index', [
-            'applications' => Application::query()
-                ->latest()
-                ->paginate(20)
-                ->withQueryString(),
+            'applications' => $applications,
+            'filters' => $filters,
+            'forms' => collect($this->forms->all())
+                ->map(fn (FormDefinition $form): array => [
+                    'slug' => $form->slug(),
+                    'name' => $form->formName(),
+                ])
+                ->values(),
+        ]);
+    }
+
+    public function show(Application $application): \Inertia\Response
+    {
+        $form = $this->forms->find($application->form_slug);
+
+        return \Inertia\Inertia::render('AllApplications/Show', [
+            'application' => [
+                'id' => $application->id,
+                'form_slug' => $application->form_slug,
+                'form_name' => $form instanceof FormDefinition ? $form->formName() : $application->form_name,
+                'reference_no' => $application->payment_reference,
+                'name' => $application->name,
+                'phone' => $application->phone,
+                'address' => $application->address,
+                'submitted' => $application->submitted,
+                'submitted_at' => $application->created_at?->toIso8601String(),
+                'payment_status' => $application->payment_status,
+                'payment_amount' => $application->payment_amount,
+                'payment_method' => $application->payment_method,
+                'merchant_name' => $application->merchant_name,
+                'form_data' => $application->form_data ?? [],
+                'field_sources' => $application->form_field_sources,
+            ],
         ]);
     }
 
@@ -70,7 +106,8 @@ class FormController extends Controller
 
         $validated = $request->validate($form->submissionRules());
 
-        $formData = $form->storedFormData($validated['form_data'] ?? []);
+        $submittedFormData = $validated['form_data'] ?? [];
+        $formData = $form->storedFormData($submittedFormData);
         $address = $form->composeAddress($formData, $validated['address'] ?? null);
 
         if ($address === '') {
@@ -86,6 +123,7 @@ class FormController extends Controller
             'phone' => $validated['phone'],
             'address' => $address,
             'form_data' => $formData,
+            'form_field_sources' => $form->fieldSources($submittedFormData),
             'payment_amount' => $form->paymentEnabled() ? $form->resolvePaymentAmount($formData) : null,
             'merchant_name' => $form->merchantName(),
             'submitted' => true,
@@ -103,7 +141,7 @@ class FormController extends Controller
                 'error' => $exception->getMessage(),
             ]);
         }
-
+        //sending mail
         $this->notifications->notifySubmission($form, $application);
 
         return response()->json([
@@ -250,6 +288,79 @@ class FormController extends Controller
             'url' => $application->payment_url,
             'form_slug' => $form->slug(),
         ]);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function listFilters(Request $request): array
+    {
+        $filters = [];
+
+        foreach (['reference', 'name', 'phone', 'form', 'payment_status', 'submitted_from', 'submitted_to', 'meta_info'] as $key) {
+            $value = trim((string) $request->query($key, ''));
+            $filters[$key] = $value;
+        }
+
+        return $filters;
+    }
+
+    /**
+     * @param  array<string, string>  $filters
+     */
+    private function filteredApplications(array $filters): \Illuminate\Database\Eloquent\Builder
+    {
+        $query = Application::query()->select([
+            'id',
+            'form_slug',
+            'form_name',
+            'name',
+            'phone',
+            'payment_status',
+            'payment_amount',
+            'payment_reference',
+            'meta_info',
+            'submitted',
+            'created_at',
+        ]);
+
+        if ($filters['reference'] !== '') {
+            $query->where('payment_reference', 'like', '%'.$this->like($filters['reference']).'%');
+        }
+
+        if ($filters['name'] !== '') {
+            $query->where('name', 'like', '%'.$this->like($filters['name']).'%');
+        }
+
+        if ($filters['phone'] !== '') {
+            $query->where('phone', 'like', '%'.$this->like($filters['phone']).'%');
+        }
+
+        if ($filters['form'] !== '') {
+            $query->where(function ($inner) use ($filters): void {
+                $inner->where('form_slug', $filters['form'])
+                    ->orWhere('form_name', 'like', '%'.$this->like($filters['form']).'%');
+            });
+        }
+
+        if ($filters['payment_status'] !== '') {
+            $query->where('payment_status', $filters['payment_status']);
+        }
+
+        if ($filters['submitted_from'] !== '') {
+            $query->whereDate('created_at', '>=', $filters['submitted_from']);
+        }
+
+        if ($filters['submitted_to'] !== '') {
+            $query->whereDate('created_at', '<=', $filters['submitted_to']);
+        }
+
+        return $query;
+    }
+
+    private function like(string $value): string
+    {
+        return addcslashes($value, '%_\\');
     }
 
     private function blankStringsToNull(Request $request, string $key): void

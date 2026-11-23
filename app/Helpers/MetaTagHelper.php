@@ -100,7 +100,7 @@ class MetaTagHelper
                 'contactPoint' => [
                     '@type' => 'ContactPoint',
                     'contactType' => 'Customer Service',
-                    'email' => 'info@rukhsanapackaging.online',
+                    'email' => 'info@submit-now.online',
                 ],
                 'sameAs' => [
                     // Add your social media URLs here

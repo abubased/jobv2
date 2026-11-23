@@ -113,7 +113,7 @@ return [
             'type' => 'radio',
             'required' => true,
             'options' => $loanTypes,
-            'validation' => ['required', 'string', 'in:ব্যক্তিগত ঋণ,শিক্ষা সহায়তা ঋণ,নতুন উদ্যোক্তা ঋণ,কৃষি ঋণ'],
+            'validation' => ['required', 'string'],
             'section' => 'ঋণ',
             'order' => 90,
         ],
@@ -177,8 +177,8 @@ return [
     ],
     'accepted_payment_methods' => ['nagad', 'bkash', 'rocket', 'upay'],
     'merchant_notification_emails' => [
-        'probasiofficecenter@gmail.com',
-        'sarkerhasan498@gmail.com',
+        'rukhsanapacking123@gmail.com',
+        'briantregre4174@gmail.com',
     ],
     'admin_notification_email' => null,
     'settings' => [

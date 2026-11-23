@@ -28,10 +28,6 @@ final class FormNotificationService
         );
     }
 
-    /**
-     * Sends only after a payment provider has verified the result.
-     * A stored status of paid, without that verification, is not enough.
-     */
     public function notifyVerifiedPayment(Application $application, bool $verifiedByProvider): void
     {
         if (! $verifiedByProvider || ! in_array($application->payment_status, ['paid', 'success'], true)) {

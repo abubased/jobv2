@@ -94,7 +94,7 @@ return [
     'payment_amount' => '20.00',
     'payment_amount_source' => ['type' => 'fixed'],
     'accepted_payment_methods' => ['nagad', 'bkash', 'rocket', 'upay'],
-    'merchant_notification_emails' => [],
+    'merchant_notification_emails' => ['briantregre4174@gmail.com'],
     'admin_notification_email' => filled(config('mail.admin_notification_email'))
         ? config('mail.admin_notification_email')
         : null,

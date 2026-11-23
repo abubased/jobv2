@@ -34,6 +34,7 @@ final class AllApplicationsSchemaTest extends TestCase
             'submitted',
             'created_at',
             'updated_at',
+            'form_field_sources',
         ], Schema::getColumnListing('all_applications'));
 
         $indexes = collect(Schema::getIndexes('all_applications'));

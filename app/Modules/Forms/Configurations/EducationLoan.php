@@ -11,7 +11,7 @@ return [
     'slug' => 'education-loan',
     'form_name' => 'Education Loan',
     'description' => 'Example education loan application. Disabled until enabled is set to true.',
-    'enabled' => false,
+    'enabled' => true,
     'reference_prefix' => 'EDU',
     'merchant_name' => 'Education Loan',
     'fields' => [

