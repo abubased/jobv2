@@ -2,7 +2,7 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
-import { Check, Copy, FileText, X } from 'lucide-vue-next';
+import { Check, Copy, FileText, X, Ban, Pencil, Trash2, Tag, StickyNote } from 'lucide-vue-next';
 
 interface ApplicationRow {
     id: number;
@@ -19,6 +19,9 @@ interface ApplicationRow {
     submitted: boolean;
     created_at: string;
     updated_at?: string;
+    is_blocked?: boolean;
+    labels?: string[];
+    notes?: Array<{ text: string; created_at: string }>;
 }
 
 interface PaginationLink {
@@ -97,6 +100,102 @@ const detailsApplication = ref<ApplicationDetails | null>(null);
 const detailsTargetId = ref<number | null>(null);
 const copiedDetailKey = ref<string | null>(null);
 let detailsRequestId = 0;
+
+const actionLoadingId = ref<number | null>(null);
+const actionFeedback = ref('');
+const actionError = ref('');
+const editModalOpen = ref(false);
+const editTargetId = ref<number | null>(null);
+const editForm = reactive({ name: '', phone: '', address: '' });
+const editErrors = ref<Record<string, string>>({});
+const entryModalOpen = ref(false);
+const entryModalKind = ref<'label' | 'note'>('label');
+const entryTargetId = ref<number | null>(null);
+const entryValue = ref('');
+const deleteTarget = ref<ApplicationRow | null>(null);
+const cloneSelection = ref<Record<number, string>>({});
+
+const actionRequest = (
+    row: ApplicationRow,
+    kind: string,
+    method: 'post' | 'patch' | 'delete',
+    url: string,
+    data: Record<string, string> = {},
+    onSuccess?: () => void,
+): void => {
+    actionError.value = '';
+    actionFeedback.value = '';
+    router.visit(url, {
+        method,
+        data,
+        preserveScroll: true,
+        onStart: () => { actionLoadingId.value = row.id; },
+        onSuccess: () => {
+            actionFeedback.value = `${kind} successful.`;
+            onSuccess?.();
+        },
+        onError: (errors) => {
+            const first = Object.values(errors)[0];
+            actionError.value = typeof first === 'string' ? first : `Unable to ${kind.toLowerCase()}.`;
+            editErrors.value = errors as Record<string, string>;
+        },
+        onFinish: () => { actionLoadingId.value = null; },
+    });
+};
+
+const toggleApplicationBlock = (row: ApplicationRow): void => {
+    actionRequest(row, row.is_blocked ? 'Unblock' : 'Block', 'post', `/all-applications/${row.id}/toggle-block`);
+};
+
+const openEditApplication = (row: ApplicationRow): void => {
+    editTargetId.value = row.id;
+    editForm.name = row.name ?? '';
+    editForm.phone = row.phone ?? '';
+    editForm.address = row.address ?? '';
+    editErrors.value = {};
+    editModalOpen.value = true;
+};
+
+const saveApplicationEdit = (): void => {
+    const row = rows.value.find((item) => item.id === editTargetId.value);
+    if (!row) return;
+    actionRequest(row, 'Update', 'patch', `/all-applications/${row.id}`, {
+        name: editForm.name,
+        phone: editForm.phone,
+        address: editForm.address,
+    }, () => { editModalOpen.value = false; });
+};
+
+const openEntryModal = (row: ApplicationRow, kind: 'label' | 'note'): void => {
+    entryTargetId.value = row.id;
+    entryModalKind.value = kind;
+    entryValue.value = '';
+    entryModalOpen.value = true;
+};
+
+const saveEntry = (): void => {
+    const row = rows.value.find((item) => item.id === entryTargetId.value);
+    if (!row || !entryValue.value.trim()) return;
+    const kind = entryModalKind.value;
+    actionRequest(row, kind === 'label' ? 'Add label' : 'Add note', 'post',
+        `/all-applications/${row.id}/${kind === 'label' ? 'labels' : 'notes'}`,
+        { [kind]: entryValue.value },
+        () => { entryModalOpen.value = false; entryValue.value = ''; });
+};
+
+const confirmDeleteApplication = (): void => {
+    const row = deleteTarget.value;
+    if (!row) return;
+    actionRequest(row, 'Delete', 'delete', `/all-applications/${row.id}`, {}, () => {
+        rows.value = rows.value.filter((item) => item.id !== row.id);
+        deleteTarget.value = null;
+    });
+};
+
+const selectCloneOption = (row: ApplicationRow, event: Event): void => {
+    cloneSelection.value[row.id] = (event.target as HTMLSelectElement).value;
+    // Clone options are intentionally inert placeholders.
+};
 
 const humanizeFieldLabel = (path: string): string => path
     .replace(/\[(\d+)\]/g, ' $1')
@@ -593,6 +692,9 @@ const prependApplication = (payload: CreatedPayload) => {
         payment_amount: null,
         payment_reference: payload.reference_no,
         submitted: true,
+        is_blocked: false,
+        labels: [],
+        notes: [],
         created_at: payload.submitted_at ?? '',
     });
 };
@@ -845,13 +947,40 @@ onUnmounted(() => {
                             <td class="whitespace-nowrap px-4 py-3 text-gray-600 dark:text-gray-300">
                                 {{ row.created_at ? new Date(row.created_at).toLocaleString() : '—' }}
                             </td>
-                            <td class="px-4 py-3 text-right">
-                                <Link
-                                    class="inline-flex items-center rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
-                                    :href="`/all-applications/${row.id}`"
-                                >
-                                    View
-                                </Link>
+                            <td class="px-4 py-3">
+                                <div class="flex min-w-[230px] flex-col items-end gap-2">
+                                    <div class="flex flex-wrap justify-end gap-1.5">
+                                        <button type="button" :disabled="actionLoadingId === row.id" class="inline-flex items-center gap-1 rounded-md border border-amber-300 px-2 py-1 text-xs font-medium text-amber-800 hover:bg-amber-50 disabled:opacity-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950/40" @click="toggleApplicationBlock(row)">
+                                            <Ban class="h-3.5 w-3.5" />{{ row.is_blocked ? 'Unblock' : 'Block' }}
+                                        </button>
+                                        <button type="button" :disabled="actionLoadingId === row.id" class="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800" @click="openEditApplication(row)">
+                                            <Pencil class="h-3.5 w-3.5" />Edit
+                                        </button>
+                                        <button type="button" :disabled="actionLoadingId === row.id" class="inline-flex items-center gap-1 rounded-md border border-red-200 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/40" @click="deleteTarget = row">
+                                            <Trash2 class="h-3.5 w-3.5" />Delete
+                                        </button>
+                                    </div>
+                                    <div class="flex flex-wrap justify-end gap-1.5">
+                                        <button type="button" :disabled="actionLoadingId === row.id" class="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800" @click="openEntryModal(row, 'label')">
+                                            <Tag class="h-3.5 w-3.5" />Add Label
+                                        </button>
+                                        <button type="button" :disabled="actionLoadingId === row.id" class="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800" @click="openEntryModal(row, 'note')">
+                                            <StickyNote class="h-3.5 w-3.5" />Add Note
+                                        </button>
+                                        <select :value="cloneSelection[row.id] || ''" class="max-w-[115px] rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200" aria-label="Clone options" @change="selectCloneOption(row, $event)">
+                                            <option value="">Select Clone</option>
+                                            <option value="clone-one">Clone One</option>
+                                            <option value="clone-two">Clone Two</option>
+                                            <option value="clone-three">Clone Three</option>
+                                            <option value="clone-four">Clone Four</option>
+                                        </select>
+                                    </div>
+                                    <div v-if="row.labels?.length" class="flex flex-wrap justify-end gap-1">
+                                        <span v-for="label in row.labels" :key="label" class="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">{{ label }}</span>
+                                    </div>
+                                    <span v-if="row.notes?.length" class="text-[10px] text-gray-500 dark:text-gray-400">{{ row.notes.length }} note{{ row.notes.length === 1 ? '' : 's' }}</span>
+                                    <span v-if="row.is_blocked" class="text-[10px] font-semibold text-amber-700 dark:text-amber-300">Blocked</span>
+                                </div>
                             </td>
                         </tr>
                     </tbody>
@@ -885,6 +1014,68 @@ onUnmounted(() => {
                     <button type="button" class="rounded border px-3 py-2 text-sm" @click="refreshList">Refresh</button>
                 </div>
             </form>
+        </div>
+
+        <div v-if="actionFeedback || actionError" class="fixed right-4 top-4 z-[120] max-w-sm rounded-lg border px-4 py-3 text-sm shadow-lg" :class="actionError ? 'border-red-300 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200' : 'border-green-300 bg-green-50 text-green-800 dark:border-green-900 dark:bg-green-950 dark:text-green-200'">
+            <div class="flex items-start gap-3">
+                <span class="flex-1">{{ actionError || actionFeedback }}</span>
+                <button type="button" aria-label="Dismiss" @click="actionError = ''; actionFeedback = ''"><X class="h-4 w-4" /></button>
+            </div>
+        </div>
+
+        <div v-if="editModalOpen" class="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-3" @click.self="editModalOpen = false">
+            <section class="w-full max-w-lg rounded-2xl border border-gray-200 bg-white p-5 shadow-2xl dark:border-gray-700 dark:bg-gray-900" role="dialog" aria-modal="true" aria-labelledby="edit-application-title">
+                <header class="mb-4 flex items-center justify-between">
+                    <h2 id="edit-application-title" class="text-lg font-semibold text-gray-900 dark:text-gray-100">Edit application</h2>
+                    <button type="button" class="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800" @click="editModalOpen = false"><X class="h-5 w-5" /></button>
+                </header>
+                <form class="space-y-3" @submit.prevent="saveApplicationEdit">
+                    <label class="block text-sm text-gray-700 dark:text-gray-200">Applicant name
+                        <input v-model="editForm.name" required maxlength="255" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100" />
+                        <span v-if="editErrors.name" class="text-xs text-red-600">{{ editErrors.name }}</span>
+                    </label>
+                    <label class="block text-sm text-gray-700 dark:text-gray-200">Phone
+                        <input v-model="editForm.phone" required maxlength="40" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100" />
+                        <span v-if="editErrors.phone" class="text-xs text-red-600">{{ editErrors.phone }}</span>
+                    </label>
+                    <label class="block text-sm text-gray-700 dark:text-gray-200">Address
+                        <textarea v-model="editForm.address" rows="3" maxlength="2000" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"></textarea>
+                        <span v-if="editErrors.address" class="text-xs text-red-600">{{ editErrors.address }}</span>
+                    </label>
+                    <div class="flex justify-end gap-2 pt-2">
+                        <button type="button" class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 dark:border-gray-700 dark:text-gray-200" @click="editModalOpen = false">Cancel</button>
+                        <button type="submit" :disabled="actionLoadingId === editTargetId" class="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{{ actionLoadingId === editTargetId ? 'Saving…' : 'Save changes' }}</button>
+                    </div>
+                </form>
+            </section>
+        </div>
+
+        <div v-if="entryModalOpen" class="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-3" @click.self="entryModalOpen = false">
+            <section class="w-full max-w-lg rounded-2xl border border-gray-200 bg-white p-5 shadow-2xl dark:border-gray-700 dark:bg-gray-900" role="dialog" aria-modal="true">
+                <header class="mb-4 flex items-center justify-between">
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">{{ entryModalKind === 'label' ? 'Add label' : 'Add note' }}</h2>
+                    <button type="button" class="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800" @click="entryModalOpen = false"><X class="h-5 w-5" /></button>
+                </header>
+                <form class="space-y-4" @submit.prevent="saveEntry">
+                    <input v-if="entryModalKind === 'label'" v-model="entryValue" required maxlength="60" placeholder="Label name" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100" />
+                    <textarea v-else v-model="entryValue" required maxlength="5000" rows="5" placeholder="Write a note…" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"></textarea>
+                    <div class="flex justify-end gap-2">
+                        <button type="button" class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 dark:border-gray-700 dark:text-gray-200" @click="entryModalOpen = false">Cancel</button>
+                        <button type="submit" :disabled="!entryValue.trim() || actionLoadingId === entryTargetId" class="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{{ actionLoadingId === entryTargetId ? 'Saving…' : 'Save' }}</button>
+                    </div>
+                </form>
+            </section>
+        </div>
+
+        <div v-if="deleteTarget" class="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-3" @click.self="deleteTarget = null">
+            <section class="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-5 shadow-2xl dark:border-gray-700 dark:bg-gray-900" role="dialog" aria-modal="true" aria-labelledby="delete-application-title">
+                <h2 id="delete-application-title" class="text-lg font-semibold text-gray-900 dark:text-gray-100">Delete application?</h2>
+                <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">This permanently deletes application #{{ deleteTarget.id }} for {{ deleteTarget.name }}. This action cannot be undone.</p>
+                <div class="mt-5 flex justify-end gap-2">
+                    <button type="button" class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 dark:border-gray-700 dark:text-gray-200" @click="deleteTarget = null">Cancel</button>
+                    <button type="button" :disabled="actionLoadingId === deleteTarget.id" class="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" @click="confirmDeleteApplication">{{ actionLoadingId === deleteTarget.id ? 'Deleting…' : 'Delete permanently' }}</button>
+                </div>
+            </section>
         </div>
 
         <div

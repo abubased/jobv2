@@ -347,6 +347,9 @@ class FormController extends Controller
             'payment_status' => $application->payment_status,
             'payment_amount' => $application->payment_amount,
             'merchant_name' => $application->merchant_name,
+            'is_blocked' => (bool) $application->is_blocked,
+            'labels' => is_array($application->labels) ? $application->labels : [],
+            'notes' => is_array($application->notes) ? $application->notes : [],
             'submitted' => $application->submitted,
             'created_at' => $application->created_at?->toIso8601String(),
             'updated_at' => $application->updated_at?->toIso8601String(),
@@ -392,6 +395,9 @@ class FormController extends Controller
             'payment_method',
             'payment_url',
             'merchant_name',
+            'is_blocked',
+            'labels',
+            'notes',
         ]);
 
         if ($filters['reference'] !== '') {

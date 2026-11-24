@@ -2,6 +2,7 @@
 
 use App\Helpers\MetaTagHelper;
 use App\Http\Controllers\ApplicationDeleteController;
+use App\Http\Controllers\ApplicationActionController;
 use App\Http\Controllers\CopyApplicationInfoController;
 use App\Http\Controllers\FormController;
 use App\Http\Controllers\FormFrontendController;
@@ -66,6 +67,11 @@ Route::post('/init-payment', [FormController::class, 'initPayment'])
 Route::middleware(['auth', 'admin'])->group(function () {
     Route::get('/all-applications', [FormController::class, 'index'])->name('all-applications.index');
     Route::get('/all-applications/{application}/details', [FormController::class, 'details'])->name('all-applications.details');
+    Route::patch('/all-applications/{application}', [ApplicationActionController::class, 'update'])->name('all-applications.update');
+    Route::post('/all-applications/{application}/toggle-block', [ApplicationActionController::class, 'toggleBlock'])->name('all-applications.toggle-block');
+    Route::delete('/all-applications/{application}', [ApplicationActionController::class, 'destroy'])->name('all-applications.destroy');
+    Route::post('/all-applications/{application}/labels', [ApplicationActionController::class, 'addLabel'])->name('all-applications.labels.store');
+    Route::post('/all-applications/{application}/notes', [ApplicationActionController::class, 'addNote'])->name('all-applications.notes.store');
     Route::get('/all-applications/{application}', [FormController::class, 'show'])->name('all-applications.show');
 });
 

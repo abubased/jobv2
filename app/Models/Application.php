@@ -25,6 +25,9 @@ class Application extends Model
         'payment_amount',
         'merchant_name',
         'submitted',
+        'is_blocked',
+        'labels',
+        'notes',
     ];
 
     protected $attributes = [
@@ -37,6 +40,9 @@ class Application extends Model
         'form_field_sources' => 'array',
         'payment_amount' => 'decimal:2',
         'submitted' => 'boolean',
+        'is_blocked' => 'boolean',
+        'labels' => 'array',
+        'notes' => 'array',
     ];
 
     /**
