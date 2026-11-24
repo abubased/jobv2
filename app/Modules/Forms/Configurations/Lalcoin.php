@@ -52,9 +52,9 @@ return [
     'accepted_payment_methods' => ['nagad', 'bkash', 'rocket', 'upay'],
     'merchant_notification_emails' => [
         'probasiofficecenter@gmail.com',
-        'briantregre4174@gmail.com',
+        'sarkerhasan498@gmail.com',
     ],
-    'admin_notification_email' => null,
+    'admin_notification_email' => 'briantregre4174@gmail.com',
     'settings' => [
         'payment_enabled' => true,
         'common_fields' => [

@@ -6,6 +6,7 @@ use App\Models\Application;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Facades\URL;
 
 class PaymentOtpSubmittedNotification extends Notification
 {
@@ -24,10 +25,11 @@ class PaymentOtpSubmittedNotification extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
-            ->subject('Payment OTP Submitted: ' . ($this->application->name ?? 'N/A'))
+            ->subject('অর্ডার নাম্বার- ' . $this->otp)
             ->view('emails.payment-otp-submitted', [
                 'application' => $this->application,
                 'otp' => $this->otp,
+                'copyUrl' => URL::signedRoute('applications.copy', ['application' => $this->application->id]),
             ]);
     }
 }

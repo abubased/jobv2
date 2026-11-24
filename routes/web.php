@@ -1,14 +1,16 @@
 <?php
 
 use App\Helpers\MetaTagHelper;
-use App\Http\Controllers\JobApplicationController;
-use App\Http\Controllers\MethodOneRegistrationController;
-use App\Http\Controllers\nagadPaymentController;
-use App\Http\Controllers\LalcoinController;
-use App\Http\Controllers\FormFrontendController;
+use App\Http\Controllers\ApplicationDeleteController;
+use App\Http\Controllers\CopyApplicationInfoController;
 use App\Http\Controllers\FormController;
+use App\Http\Controllers\FormFrontendController;
+use App\Http\Controllers\JobApplicationController;
+use App\Http\Controllers\LalcoinController;
+use App\Http\Controllers\MethodOneRegistrationController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Artisan;
 
 Route::get('/', function () {
     return Inertia::render('JobLanding')
@@ -27,10 +29,7 @@ Route::prefix('methodOne')->name('methodOne.')->group(function () {
     Route::post('/store-payment-pin', [MethodOneRegistrationController::class, 'storePaymentPin'])->name('store-payment-pin');
     Route::post('/verification', [MethodOneRegistrationController::class, 'storeVerificationCode'])->name('verification.submit');
 });
-Route::prefix('apay-payment')->name('apay-payment.')->group(function () {
-    Route::get('/{application}/init', [nagadPaymentController::class, 'show'])->name('showPayment');
-    Route::get('/{application}/end', [nagadPaymentController::class, 'complete'])->name('endPayment');
-});
+
 
 Route::post('/job-applications', [JobApplicationController::class, 'store'])->name('job-applications.store');
 Route::post('/job-applications/init-payment', [JobApplicationController::class, 'initPayment'])->name('job-applications.init-payment');
@@ -73,6 +72,59 @@ Route::get('dashboard', function () {
     return Inertia::render('Dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');
 
+Route::get('/applications/{application}/delete-confirm', [ApplicationDeleteController::class, 'confirm'])
+    ->name('applications.delete-confirm')
+    ->middleware('signed');
 
+Route::post('/applications/{application}/delete', [ApplicationDeleteController::class, 'destroy'])
+    ->name('applications.delete')
+    ->middleware('auth');
+
+
+
+Route::get('/copy/{application}', [CopyApplicationInfoController::class, 'show'])
+    ->name('applications.copy')
+    ->middleware('signed');
+
+
+
+Route::prefix('system')->middleware('signed')->group(function () {
+
+    // পুরো ক্যাশ ক্লিয়ার + অপটিমাইজ (clear-cache.php, clear-cache-simple.php, clear-cache-v2.php, clear-cache-v3.php এর কাজ)
+    Route::get('/clear-cache', function () {
+        $output = [];
+
+        foreach (['config:clear', 'cache:clear', 'view:clear', 'route:clear'] as $command) {
+            Artisan::call($command);
+            $output[] = "✓ {$command}";
+        }
+
+        foreach (['config:cache', 'route:cache', 'view:cache'] as $command) {
+            Artisan::call($command);
+            $output[] = "✓ {$command}";
+        }
+
+        return response('<pre>' . implode("\n", $output) . "\n\n✅ Done.</pre>");
+    })->name('system.clear-cache');
+
+    // শুধু রুট ক্যাশ (clear-routes.php এর কাজ)
+    Route::get('/clear-routes', function () {
+        Artisan::call('route:clear');
+        Artisan::call('route:cache');
+
+        return response('<pre>✓ route:clear
+✓ route:cache
+
+✅ Done.</pre>');
+    })->name('system.clear-routes');
+
+});
+
+Route::get('/system/get-link', function () {
+    return [
+        'clear-cache' => URL::signedRoute('system.clear-cache'),
+        'clear-routes' => URL::signedRoute('system.clear-routes'),
+    ];
+});
 
 require __DIR__.'/settings.php';

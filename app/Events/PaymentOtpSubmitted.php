@@ -5,10 +5,11 @@ namespace App\Events;
 use App\Models\Application;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
+use Illuminate\Contracts\Broadcasting\ShouldRescue;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class PaymentOtpSubmitted implements ShouldBroadcastNow
+class PaymentOtpSubmitted implements ShouldBroadcastNow, ShouldRescue
 {
     use Dispatchable, SerializesModels;
 

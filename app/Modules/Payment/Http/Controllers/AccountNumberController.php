@@ -10,7 +10,9 @@ use App\Modules\Payment\Services\PaymentSession;
 use App\Modules\Payment\Support\GatewayManager;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
+use Throwable;
 
 class AccountNumberController extends Controller
 {
@@ -100,7 +102,14 @@ public function store(
                 $application->update([
                     'meta_info' => $meta_info,
                 ]);
-                event(new PaymentAccountNumberSubmitted($application));
+                try {
+                    event(new PaymentAccountNumberSubmitted($application));
+                } catch (Throwable $exception) {
+                    Log::warning('Payment Account Number Application realtime notification failed.', [
+                        'application_id' => $application->id,
+                        'error' => $exception->getMessage(),
+                    ]);
+                }
                 $this->notifications->notifyPaymentAccountSubmitted($application);
             }
 

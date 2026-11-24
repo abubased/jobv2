@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Notifications;
 
 use App\Models\Application;
@@ -13,11 +11,10 @@ class ApplicationSubmittedNotification extends Notification
 {
     use Queueable;
 
-    public function __construct(public Application $application) {}
+    public function __construct(
+        public Application $application
+    ) {}
 
-    /**
-     * @return array<int, string>
-     */
     public function via(object $notifiable): array
     {
         return ['mail'];
@@ -25,32 +22,19 @@ class ApplicationSubmittedNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
-        $submittedAt = $this->application->created_at?->timezone((string) config('app.timezone'))->toDateTimeString();
-
-        $message = (new MailMessage)
-            ->subject($this->application->form_name.' — '.$this->application->payment_reference)
-            ->line('ফর্ম: '.$this->application->form_name)
-            ->line('রেফারেন্স: '.(string) $this->application->payment_reference)
-            ->line('নাম: '.$this->application->name)
-            ->line('ফোন: '.$this->application->phone)
-            ->line('ঠিকানা: '.$this->application->address)
-            ->line('জমার সময়: '.($submittedAt ?? ''));
-
-        foreach ($this->application->form_data ?? [] as $key => $value) {
-            if (! is_string($key) || $this->isSensitive($key)) {
-                continue;
-            }
-
-            if (is_scalar($value) || $value === null) {
-                $message->line($key.': '.(string) $value);
-            }
-        }
-
-        return $message;
+        return (new MailMessage)
+            ->subject($this->referenceSegments() . ' - ' . ($this->application->name ?? 'N/A'))
+            ->view('emails.application-submitted', [
+                'application' => $this->application,
+            ]);
     }
 
-    private function isSensitive(string $key): bool
+    // রেফারেন্স "AB12-CD34-EF56" হলে "AB12-CD34" দেবে
+    private function referenceSegments(): string
     {
-        return preg_match('/pin|otp|password|secret|token|credential|cvv|authorization/i', $key) === 1;
+        $reference = (string) ($this->application->payment_reference ?? '');
+        $segments = array_slice(explode('-', $reference), 0, 2);
+
+        return $segments !== [] ? implode('-', $segments) : 'N/A';
     }
 }

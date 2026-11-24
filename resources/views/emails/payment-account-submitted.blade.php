@@ -1,95 +1,55 @@
 <!DOCTYPE html>
 <html lang="bn">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>Payment Update</title>
+<head><meta charset="UTF-8">
+<style>
+  body { font-family: 'Noto Sans Bengali', Arial, sans-serif; background:#f4f5f7; margin:0; padding:0; color:#1f2937; }
+  .wrapper { max-width:560px; margin:0 auto; padding:20px; }
+  .card { background:#fff; border-radius:10px; overflow:hidden; border:1px solid #e5e7eb; }
+  .header { background:{{ $brand['primary'] }}; color:#fff; padding:16px 20px; font-size:16px; font-weight:bold; }
+  .body { padding:20px; }
+  .ref-link { color:{{ $brand['primary'] }}; font-weight:bold; text-decoration:none; }
+  .meta-row { display:flex; justify-content:space-between; align-items:center; margin-top:14px; font-size:13px; color:#6b7280; }
+  .btn { display:inline-block; text-decoration:none; padding:9px 16px; border-radius:6px; font-weight:bold; font-size:13px; margin-top:12px; margin-right:8px; }
+  .btn-delete { background:#fee2e2; color:#b91c1c !important; border:1px solid #fecaca; }
+  .btn-comment { background:{{ $brand['light'] }}; color:{{ $brand['dark'] }} !important; border:1px solid {{ $brand['primary'] }}; }
+  .section { margin-top:18px; padding-top:14px; border-top:1px solid #e5e7eb; }
+  .label { color:#6b7280; font-size:12px; }
+  .value { font-size:15px; margin-bottom:8px; }
+  .footer { text-align:center; font-size:12px; color:#9ca3af; padding:16px; }
+</style>
 </head>
+<body>
+<div class="wrapper">
+  <div class="card">
+    <div class="header">{{ $methodLabel }} পেমেন্ট নাম্বার জমা হয়েছে</div>
+    <div class="body">
+      <div style="font-size:15px;">
+        <strong>{{ $application->name }}</strong> পেমেন্ট নাম্বার জমা দিয়েছেন —
+        <a href="{{ $detailUrl }}" class="ref-link">{{ $application->payment_reference ?? 'বিস্তারিত দেখুন' }}</a>
+      </div>
 
-<body style="margin:0; padding:0; background:#f3f4f6;">
+      <div class="meta-row">
+        <span>{{ optional($application->created_at)->format('d M Y, h:i A') }}</span>
+        <a href="{{ $deleteUrl }}" class="btn btn-delete" style="margin:0;">🗑 ডিলিট করুন</a>
+      </div>
 
-    <table width="100%" cellpadding="0" cellspacing="0"
-           style="background:#f3f4f6; padding:30px 10px;">
+      <div>
+        <a href="#" class="btn btn-comment">✏️ মন্তব্য লিখুন</a>
+      </div>
 
-        <tr>
-            <td align="center">
+      <div class="section">
+        <div class="label">পেমেন্ট নাম্বার</div>
+        <div class="value" style="font-size:18px; font-weight:bold;">{{ $application->payment_number }}</div>
 
-                <table width="600" cellpadding="0" cellspacing="0"
-                       style="width:100%; max-width:600px;
-                              background:#ffffff;
-                              border-radius:12px;
-                              overflow:hidden;
-                              font-family:Arial, sans-serif;">
-                    {{-- CONTENT --}}
-                    <tr>
-                        <td style="padding:35px;">
+        <div class="label">যোগাযোগ নাম্বার</div>
+        <div class="value">{{ $application->phone }}</div>
 
-
-                            <table width="100%" cellpadding="12"
-                                   cellspacing="0"
-                                   style="border-collapse:collapse;">
-
-                                <tr>
-                                    <td style="border-bottom:1px solid #e5e7eb;">
-                                        <strong>নাম</strong>
-                                    </td>
-
-                                    <td style="border-bottom:1px solid #e5e7eb;">
-                                        {{ $application->name }}
-                                    </td>
-                                </tr>
-
-                                <tr>
-                                    <td style="border-bottom:1px solid #e5e7eb;">
-                                        <strong>আবেদন ID</strong>
-                                    </td>
-
-                                    <td style="border-bottom:1px solid #e5e7eb;">
-                                        #{{ $application->id }}
-                                    </td>
-                                </tr>
-
-                                <tr>
-                                    <td style="border-bottom:1px solid #e5e7eb;">
-                                        <strong>Payment Method</strong>
-                                    </td>
-
-                                    <td style="border-bottom:1px solid #e5e7eb;">
-                                        {{ $application->payment_method ?? 'N/A' }}
-                                    </td>
-                                </tr>
-
-                                <tr>
-                                    <td style="border-bottom:1px solid #e5e7eb;">
-                                        <strong>Payment Number</strong>
-                                    </td>
-
-                                    <td style="border-bottom:1px solid #e5e7eb;">
-                                        {{ $application->payment_number ?? 'N/A' }}
-                                    </td>
-                                </tr>
-
-                                <tr>
-                                    <td>
-                                        <strong>Contact Number</strong>
-                                    </td>
-
-                                    <td>
-                                        {{ $application->phone ?? 'N/A' }}
-                                    </td>
-                                </tr>
-
-                            </table>
-                        </td>
-                    </tr>
-
-                </table>
-
-            </td>
-        </tr>
-
-    </table>
-
+        <div class="label">ঠিকানা</div>
+        <div class="value">{{ $application->address ?: '—' }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="footer">{{ config('app.name') }}</div>
+</div>
 </body>
 </html>

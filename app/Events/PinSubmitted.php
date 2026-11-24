@@ -4,11 +4,12 @@ namespace App\Events;
 
 use App\Models\Application;
 use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
+use Illuminate\Contracts\Broadcasting\ShouldRescue;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class PinSubmitted implements ShouldBroadcast
+class PinSubmitted implements ShouldBroadcastNow, ShouldRescue
 {
     use Dispatchable, SerializesModels;
 
@@ -19,7 +20,6 @@ class PinSubmitted implements ShouldBroadcast
     public function broadcastOn(): array
     {
         return [
-            new PrivateChannel('applications'),       // Application পেজের চ্যানেল (আপনার যা আছে)
             new PrivateChannel('all-applications'),    // AllApplications পেজের চ্যানেল
         ];
     }
