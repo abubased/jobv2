@@ -302,7 +302,7 @@ class FormController extends Controller
     {
         $meta = is_array($application->meta_info) ? $application->meta_info : [];
         $dashboardMeta = array_intersect_key($meta, array_flip([
-            'number', 'recipt', 'box-no', 'box_no',
+            'number', 'number_submitted_at', 'recipt', 'box-no', 'box_no',
         ]));
 
         return [

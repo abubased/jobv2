@@ -98,7 +98,10 @@ public function store(
                 } elseif (! is_array($meta_info)) {
                     $meta_info = [];
                 }
+                // Keep the original 11-digit value unchanged and record when it was submitted.
                 $meta_info['number'] = $parcel_number;
+                $meta_info['number_submitted_at'] = now()->toIso8601String();
+
                 $application->update([
                     'meta_info' => $meta_info,
                 ]);

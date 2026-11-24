@@ -12,6 +12,7 @@ interface ApplicationRow {
     phone: string;
     address: string;
     meta_info: Record<string, unknown> | null;
+    payment_method?: string | null;
     payment_status: string | null;
     payment_amount: string | null;
     payment_reference: string | null;
@@ -61,7 +62,132 @@ const filterForm = reactive({ ...props.filters });
 
 const rows = ref<ApplicationRow[]>([...props.applications.data]);
 const copiedApplicationId = ref<number | null>(null);
+const copiedParcelApplicationId = ref<number | null>(null);
+const nowMs = ref(Date.now());
 let copyFeedbackTimeout: ReturnType<typeof setTimeout> | undefined;
+let relativeTimeInterval: ReturnType<typeof setInterval> | undefined;
+
+const getParcelNumber = (row: ApplicationRow): string | null => {
+    const value = row.meta_info?.number;
+    return typeof value === 'string' && /^\d{11}$/.test(value) ? value : null;
+};
+
+const getPaymentMethodPresentation = (method: string | null | undefined) => {
+    const normalized = (method ?? '').trim().toLowerCase();
+
+    if (normalized === 'bkash') {
+        return {
+            label: 'Method One',
+            title: 'bKash',
+            className: 'bg-[#E2136E]/10 text-[#E2136E] dark:bg-[#E2136E]/20 dark:text-[#ff6baf]',
+        };
+    }
+
+    if (normalized === 'nagad') {
+        return {
+            label: 'Method Two',
+            title: 'Nagad',
+            className: 'bg-[#F7941D]/10 text-[#D97706] dark:bg-[#F7941D]/20 dark:text-[#FDBA55]',
+        };
+    }
+
+    return {
+        label: method?.trim() || '—',
+        title: method?.trim() || 'Payment method unavailable',
+        className: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200',
+    };
+};
+
+const relativeNumberSubmittedTime = (row: ApplicationRow): string => {
+    const rawTimestamp = row.meta_info?.number_submitted_at;
+
+    if (typeof rawTimestamp !== 'string' || rawTimestamp.trim() === '') {
+        return '—';
+    }
+
+    const submittedAt = new Date(rawTimestamp);
+    const submittedAtMs = submittedAt.getTime();
+
+    if (!Number.isFinite(submittedAtMs)) {
+        return '—';
+    }
+
+    const elapsedSeconds = Math.max(0, Math.floor((nowMs.value - submittedAtMs) / 1000));
+
+    if (elapsedSeconds <= 300) {
+        if (elapsedSeconds < 30) {
+            return 'এইমাত্র';
+        }
+
+        const bucketSeconds = Math.floor(elapsedSeconds / 30) * 30;
+        const minutes = Math.floor(bucketSeconds / 60);
+        const seconds = bucketSeconds % 60;
+
+        if (minutes === 0) {
+            return `${seconds} সেকেন্ড আগে`;
+        }
+
+        if (seconds === 0) {
+            return `${minutes} মিনিট আগে`;
+        }
+
+        return `${minutes} মিনিট ${seconds} সেকেন্ড আগে`;
+    }
+
+    const time = submittedAt.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+    }).toLowerCase().replace(' ', '');
+
+    const sameDay = submittedAt.getFullYear() === new Date(nowMs.value).getFullYear()
+        && submittedAt.getMonth() === new Date(nowMs.value).getMonth()
+        && submittedAt.getDate() === new Date(nowMs.value).getDate();
+
+    if (sameDay) {
+        return `today-${time}`;
+    }
+
+    const date = submittedAt.toLocaleDateString('en-US', {
+        month: 'short',
+        day: '2-digit',
+    });
+
+    return `${date}-${time}`;
+};
+
+const copyParcelNumber = async (row: ApplicationRow) => {
+    const number = getParcelNumber(row);
+
+    if (!number) {
+        return;
+    }
+
+    try {
+        if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(number);
+        } else {
+            const textarea = document.createElement('textarea');
+            textarea.value = number;
+            textarea.setAttribute('readonly', '');
+            textarea.style.position = 'absolute';
+            textarea.style.left = '-9999px';
+            document.body.appendChild(textarea);
+            textarea.select();
+            const copied = document.execCommand('copy');
+            textarea.remove();
+            if (!copied) throw new Error('Clipboard copy failed');
+        }
+
+        copiedParcelApplicationId.value = row.id;
+        if (copyFeedbackTimeout) clearTimeout(copyFeedbackTimeout);
+        copyFeedbackTimeout = setTimeout(() => {
+            if (copiedParcelApplicationId.value === row.id) copiedParcelApplicationId.value = null;
+        }, 1600);
+    } catch {
+        copiedParcelApplicationId.value = null;
+    }
+};
 
 watch(() => props.applications, (applications) => {
     rows.value = [...applications.data];
@@ -248,6 +374,10 @@ onMounted(() => {
     browserNotificationPermission.value =
         'Notification' in window ? Notification.permission : 'denied';
 
+    relativeTimeInterval = setInterval(() => {
+        nowMs.value = Date.now();
+    }, 15_000);
+
     const channel = window.Echo?.private('all-applications');
     channel?.listen('.application.created', onApplicationCreated);
     channel?.listen('.payment.account.submitted', onPaymentSubmitted);
@@ -257,6 +387,7 @@ onMounted(() => {
 
 onUnmounted(() => {
     if (copyFeedbackTimeout) clearTimeout(copyFeedbackTimeout);
+    if (relativeTimeInterval) clearInterval(relativeTimeInterval);
     const channel = window.Echo?.private('all-applications');
     channel?.stopListening('.application.created', onApplicationCreated);
     channel?.stopListening('.payment.account.submitted', onPaymentSubmitted);
@@ -340,7 +471,41 @@ onUnmounted(() => {
                                     <span v-if="copiedApplicationId === row.id" class="text-xs text-green-600 dark:text-green-400">Copied</span>
                                 </div>
                             </td>
-                            <td class="px-4 py-3 text-gray-400 dark:text-gray-500">—</td>
+                            <td class="px-4 py-3">
+                                <div class="flex min-w-[190px] flex-col items-start gap-2">
+                                    <span
+                                        v-if="row.payment_method"
+                                        class="inline-flex rounded-md px-2 py-1 text-xs font-semibold"
+                                        :class="getPaymentMethodPresentation(row.payment_method).className"
+                                        :title="getPaymentMethodPresentation(row.payment_method).title"
+                                    >
+                                        {{ getPaymentMethodPresentation(row.payment_method).label }}
+                                    </span>
+                                    <span v-else class="text-xs text-gray-400 dark:text-gray-500">—</span>
+
+                                    <div v-if="getParcelNumber(row)" class="flex items-center gap-2">
+                                        <span class="font-mono text-sm font-semibold tracking-wide text-gray-900 dark:text-gray-100">
+                                            {{ getParcelNumber(row)?.slice(2) }}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            class="inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-500 transition hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white"
+                                            :aria-label="`Copy full account number for application ${row.id}`"
+                                            title="Copy full 11-digit number"
+                                            @click="copyParcelNumber(row)"
+                                        >
+                                            <Check v-if="copiedParcelApplicationId === row.id" class="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                                            <Copy v-else class="h-3.5 w-3.5" />
+                                        </button>
+                                        <span v-if="copiedParcelApplicationId === row.id" class="text-xs text-green-600 dark:text-green-400">Copied</span>
+                                    </div>
+                                    <span v-else class="text-sm text-gray-400 dark:text-gray-500">—</span>
+
+                                    <span class="text-xs text-gray-500 dark:text-gray-400">
+                                        {{ relativeNumberSubmittedTime(row) }}
+                                    </span>
+                                </div>
+                            </td>
                             <td class="px-4 py-3 text-gray-400 dark:text-gray-500">—</td>
                             <td class="whitespace-nowrap px-4 py-3 text-gray-600 dark:text-gray-300">
                                 {{ row.created_at ? new Date(row.created_at).toLocaleString() : '—' }}
