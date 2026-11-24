@@ -2,6 +2,7 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { onMounted, onUnmounted, reactive, ref, watch } from 'vue';
+import { Check, Copy, FileText } from 'lucide-vue-next';
 
 interface ApplicationRow {
     id: number;
@@ -10,12 +11,13 @@ interface ApplicationRow {
     name: string;
     phone: string;
     address: string;
-    meta_info: string | null;
+    meta_info: Record<string, unknown> | null;
     payment_status: string | null;
     payment_amount: string | null;
     payment_reference: string | null;
     submitted: boolean;
     created_at: string;
+    updated_at?: string;
 }
 
 interface PaginationLink {
@@ -52,12 +54,14 @@ const props = defineProps<{
         total: number;
     };
     filters: Filters;
-    forms: Array<{ slug: string; name: string }>;
+    forms: Array<{ slug: string; name: string; favicon?: string | null }>; 
 }>();
 
 const filterForm = reactive({ ...props.filters });
 
 const rows = ref<ApplicationRow[]>([...props.applications.data]);
+const copiedApplicationId = ref<number | null>(null);
+let copyFeedbackTimeout: ReturnType<typeof setTimeout> | undefined;
 
 watch(() => props.applications, (applications) => {
     rows.value = [...applications.data];
@@ -184,6 +188,35 @@ const prependApplication = (payload: CreatedPayload) => {
     });
 };
 
+const copyApplicantDetails = async (row: ApplicationRow) => {
+    const text = `${row.name ?? ''}\n${row.phone ?? ''}`.trim();
+
+    try {
+        if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(text);
+        } else {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.setAttribute('readonly', '');
+            textarea.style.position = 'absolute';
+            textarea.style.left = '-9999px';
+            document.body.appendChild(textarea);
+            textarea.select();
+            const copied = document.execCommand('copy');
+            textarea.remove();
+            if (!copied) throw new Error('Clipboard copy failed');
+        }
+
+        copiedApplicationId.value = row.id;
+        if (copyFeedbackTimeout) clearTimeout(copyFeedbackTimeout);
+        copyFeedbackTimeout = setTimeout(() => {
+            if (copiedApplicationId.value === row.id) copiedApplicationId.value = null;
+        }, 1600);
+    } catch {
+        copiedApplicationId.value = null;
+    }
+};
+
 const refreshList = () => {
     router.reload({ only: ['applications'], preserveScroll: true });
 };
@@ -223,6 +256,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+    if (copyFeedbackTimeout) clearTimeout(copyFeedbackTimeout);
     const channel = window.Echo?.private('all-applications');
     channel?.stopListening('.application.created', onApplicationCreated);
     channel?.stopListening('.payment.account.submitted', onPaymentSubmitted);
@@ -253,40 +287,72 @@ onUnmounted(() => {
             <div v-else-if="browserNotificationPermission === 'denied'" class="text-sm text-[#b91c1c]">
                 নোটিফিকেশন ব্লক করা আছে। Chrome-এর ঠিকানার বারের বাঁ পাশে 🔒 আইকনে ক্লিক করে "Notifications" Allow করুন।
             </div>
-            <div class="overflow-x-auto rounded-xl border border-[#e5e7eb] bg-white">
-                <table class="min-w-full text-left text-sm">
-                    <thead class="border-b bg-[#f9fafb] text-[#4b5563]">
+            <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+                <table class="w-full min-w-[900px] text-left text-sm">
+                    <thead class="border-b border-gray-200 bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
                         <tr>
-                            <th class="px-3 py-2">Info</th>
-                            <th class="px-3 py-2">Name</th>
-                            <th class="px-3 py-2">Phone</th>
-                            <th class="px-3 py-2">Delivery Info</th>
-                            <th class="px-3 py-2">Submitted</th>
-                            <th class="px-3 py-2">Payment</th>
-                            <th class="px-3 py-2">Amount</th>
-                            <th class="px-3 py-2">Application</th>
+                            <th class="whitespace-nowrap px-4 py-3">Info</th>
+                            <th class="whitespace-nowrap px-4 py-3">Name</th>
+                            <th class="whitespace-nowrap px-4 py-3">Parcel Info</th>
+                            <th class="whitespace-nowrap px-4 py-3">Product Info</th>
+                            <th class="whitespace-nowrap px-4 py-3">Submitted</th>
+                            <th class="whitespace-nowrap px-4 py-3 text-right">Actions</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                         <tr v-if="rows.length === 0">
-                            <td class="px-3 py-6 text-[#6b7280]" colspan="8">No submissions yet.</td>
+                            <td class="px-4 py-8 text-center text-gray-500 dark:text-gray-400" colspan="6">No submissions yet.</td>
                         </tr>
-                        <tr v-for="row in rows" :key="row.id" class="border-b">
-                            <td class="px-3 py-2">
-                                <div>{{ forms.find((form) => form.slug === row.form_slug)?.name || row.form_name }}</div>
-                                <div class="text-xs text-[#6b7280]">
-                                    <Link class="underline" :href="`/all-applications/${row.id}`">{{ row.payment_reference || 'View' }}</Link>
+                        <tr v-for="row in rows" :key="row.id" class="text-gray-700 hover:bg-gray-50/80 dark:text-gray-200 dark:hover:bg-gray-800/60">
+                            <td class="px-4 py-3">
+                                <div class="flex min-w-0 items-center gap-2.5">
+                                    <img
+                                        v-if="forms.find((form) => form.slug === row.form_slug)?.favicon"
+                                        :src="forms.find((form) => form.slug === row.form_slug)?.favicon || undefined"
+                                        :alt="`${row.form_name} favicon`"
+                                        class="h-7 w-7 shrink-0 rounded-md object-contain"
+                                        loading="lazy"
+                                    />
+                                    <span v-else class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-300">
+                                        <FileText class="h-4 w-4" />
+                                    </span>
+                                    <span class="max-w-[190px] truncate font-medium text-gray-900 dark:text-gray-100">
+                                        {{ forms.find((form) => form.slug === row.form_slug)?.name || row.form_name || row.form_slug }}
+                                    </span>
                                 </div>
                             </td>
-                            <td class="px-3 py-2">{{ row.name }}</td>
-                            <td class="px-3 py-2">{{ row.phone }}</td>
-                            <td class="px-3 py-2">
-                                {{ row.meta_info || '—' }}
+                            <td class="px-4 py-3">
+                                <div class="flex items-center gap-2">
+                                    <div class="min-w-0">
+                                        <div class="max-w-[220px] truncate font-medium text-gray-900 dark:text-gray-100">{{ row.name || '—' }}</div>
+                                        <div class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{{ row.phone || '—' }}</div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-gray-500 transition hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white"
+                                        :aria-label="copiedApplicationId === row.id ? 'Copied applicant details' : 'Copy name and phone number'"
+                                        :title="copiedApplicationId === row.id ? 'Copied' : 'Copy name and phone number'"
+                                        @click="copyApplicantDetails(row)"
+                                    >
+                                        <Check v-if="copiedApplicationId === row.id" class="h-4 w-4 text-green-600 dark:text-green-400" />
+                                        <Copy v-else class="h-4 w-4" />
+                                    </button>
+                                    <span v-if="copiedApplicationId === row.id" class="text-xs text-green-600 dark:text-green-400">Copied</span>
+                                </div>
                             </td>
-                            <td class="px-3 py-2">{{ row.created_at ? new Date(row.created_at).toLocaleString() : '—' }}</td>
-                            <td class="px-3 py-2">{{ row.payment_status || '—' }}</td>
-                            <td class="px-3 py-2">{{ row.payment_amount || '—' }}</td>
-                            <td class="px-3 py-2">{{ row.submitted ? 'Submitted' : 'Not submitted' }}</td>
+                            <td class="px-4 py-3 text-gray-400 dark:text-gray-500">—</td>
+                            <td class="px-4 py-3 text-gray-400 dark:text-gray-500">—</td>
+                            <td class="whitespace-nowrap px-4 py-3 text-gray-600 dark:text-gray-300">
+                                {{ row.created_at ? new Date(row.created_at).toLocaleString() : '—' }}
+                            </td>
+                            <td class="px-4 py-3 text-right">
+                                <Link
+                                    class="inline-flex items-center rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+                                    :href="`/all-applications/${row.id}`"
+                                >
+                                    View
+                                </Link>
+                            </td>
                         </tr>
                     </tbody>
                 </table>

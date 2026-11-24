@@ -32,6 +32,17 @@ class FormDefinition
         return (string) $this->config['form_name'];
     }
 
+    /** Optional form icon used by management dashboards. */
+    public function favicon(): ?string
+    {
+        $favicon = $this->config['favicon']
+            ?? ($this->config['frontend']['favicon'] ?? null);
+
+        return is_string($favicon) && trim($favicon) !== ''
+            ? trim($favicon)
+            : null;
+    }
+
     public function enabled(): bool
     {
         return (bool) $this->config['enabled'];

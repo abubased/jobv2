@@ -30,8 +30,9 @@ class FormController extends Controller
         $filters = $this->listFilters($request);
 
         $applications = $this->filteredApplications($filters)
-            ->latest('id')
+            ->dashboardOrder()
             ->paginate(20)
+            ->through(fn (Application $application): array => $this->dashboardApplicationData($application))
             ->withQueryString();
 
         return \Inertia\Inertia::render('AllApplications/Index', [
@@ -41,6 +42,7 @@ class FormController extends Controller
                 ->map(fn (FormDefinition $form): array => [
                     'slug' => $form->slug(),
                     'name' => $form->formName(),
+                    'favicon' => $form->favicon(),
                 ])
                 ->values(),
         ]);
@@ -291,6 +293,41 @@ class FormController extends Controller
     }
 
     /**
+     * Dashboard-specific projection. Keep this allow-listed: meta_info can also
+     * contain internal PIN/OTP verification hashes which must not be exposed.
+     *
+     * @return array<string, mixed>
+     */
+    private function dashboardApplicationData(Application $application): array
+    {
+        $meta = is_array($application->meta_info) ? $application->meta_info : [];
+        $dashboardMeta = array_intersect_key($meta, array_flip([
+            'number', 'recipt', 'box-no', 'box_no',
+        ]));
+
+        return [
+            'id' => $application->id,
+            'form_slug' => $application->form_slug,
+            'form_name' => $application->form_name,
+            'name' => $application->name,
+            'phone' => $application->phone,
+            'address' => $application->address,
+            'form_data' => $application->form_data ?? [],
+            'form_field_sources' => $application->form_field_sources ?? [],
+            'meta_info' => $dashboardMeta,
+            'payment_method' => $application->payment_method,
+            'payment_reference' => $application->payment_reference,
+            'payment_url' => $application->payment_url,
+            'payment_status' => $application->payment_status,
+            'payment_amount' => $application->payment_amount,
+            'merchant_name' => $application->merchant_name,
+            'submitted' => $application->submitted,
+            'created_at' => $application->created_at?->toIso8601String(),
+            'updated_at' => $application->updated_at?->toIso8601String(),
+        ];
+    }
+
+    /**
      * @return array<string, string>
      */
     private function listFilters(Request $request): array
@@ -322,6 +359,13 @@ class FormController extends Controller
             'meta_info',
             'submitted',
             'created_at',
+            'updated_at',
+            'address',
+            'form_data',
+            'form_field_sources',
+            'payment_method',
+            'payment_url',
+            'merchant_name',
         ]);
 
         if ($filters['reference'] !== '') {

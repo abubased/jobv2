@@ -32,11 +32,21 @@ class Application extends Model
     ];
 
     protected $casts = [
+        'meta_info' => 'array',
         'form_data' => 'array',
         'form_field_sources' => 'array',
         'payment_amount' => 'decimal:2',
         'submitted' => 'boolean',
     ];
+
+    /**
+     * Canonical ordering for the All Applications dashboard.
+     * The id tie-breaker makes pagination deterministic when timestamps match.
+     */
+    public function scopeDashboardOrder(Builder $query): Builder
+    {
+        return $query->orderByDesc('updated_at')->orderByDesc('id');
+    }
 
     public function scopeForForm(Builder $query, string $formSlug): Builder
     {
