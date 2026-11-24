@@ -65,6 +65,7 @@ Route::post('/init-payment', [FormController::class, 'initPayment'])
     ->name('forms.init-payment');
 Route::middleware(['auth', 'admin'])->group(function () {
     Route::get('/all-applications', [FormController::class, 'index'])->name('all-applications.index');
+    Route::get('/all-applications/{application}/details', [FormController::class, 'details'])->name('all-applications.details');
     Route::get('/all-applications/{application}', [FormController::class, 'show'])->name('all-applications.show');
 });
 

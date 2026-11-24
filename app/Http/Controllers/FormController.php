@@ -48,6 +48,30 @@ class FormController extends Controller
         ]);
     }
 
+    /**
+     * Return the minimum application details required by the admin dashboard modal.
+     *
+     * The route is protected by the existing auth + admin middleware. Sensitive
+     * payment and form payloads are deliberately not added to the paginated list.
+     */
+    public function details(Application $application): JsonResponse
+    {
+        return response()->json([
+            'application' => [
+                'id' => $application->id,
+                'form_slug' => $application->form_slug,
+                'form_name' => $application->form_name,
+                'name' => $application->name,
+                'phone' => $application->phone,
+                'form_data' => is_array($application->form_data) ? $application->form_data : [],
+                'form_field_sources' => is_array($application->form_field_sources)
+                    ? $application->form_field_sources
+                    : null,
+                'payment_url' => $application->payment_url,
+            ],
+        ]);
+    }
+
     public function show(Application $application): \Inertia\Response
     {
         $form = $this->forms->find($application->form_slug);

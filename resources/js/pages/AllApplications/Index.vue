@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { onMounted, onUnmounted, reactive, ref, watch } from 'vue';
-import { Check, Copy, FileText } from 'lucide-vue-next';
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
+import { Check, Copy, FileText, X } from 'lucide-vue-next';
 
 interface ApplicationRow {
     id: number;
@@ -35,6 +35,24 @@ interface CreatedPayload {
     submitted_at: string | null;
     name: string;
     phone: string;
+}
+
+interface ApplicationDetails {
+    id: number;
+    form_slug: string;
+    form_name: string;
+    name: string;
+    phone: string;
+    form_data: Record<string, unknown>;
+    form_field_sources: Record<string, string> | null;
+    payment_url: string | null;
+}
+
+interface DetailField {
+    path: string;
+    label: string;
+    value: string;
+    source: string | null;
 }
 
 interface Filters {
@@ -71,6 +89,135 @@ const countdownNowMs = ref(Date.now());
 let copyFeedbackTimeout: ReturnType<typeof setTimeout> | undefined;
 let relativeTimeInterval: ReturnType<typeof setInterval> | undefined;
 let countdownInterval: ReturnType<typeof setInterval> | undefined;
+
+const detailsOpen = ref(false);
+const detailsLoading = ref(false);
+const detailsError = ref('');
+const detailsApplication = ref<ApplicationDetails | null>(null);
+const detailsTargetId = ref<number | null>(null);
+const copiedDetailKey = ref<string | null>(null);
+let detailsRequestId = 0;
+
+const humanizeFieldLabel = (path: string): string => path
+    .replace(/\[(\d+)\]/g, ' $1')
+    .replace(/[._-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase()) || 'Value';
+
+const displayFieldValue = (value: unknown): string => {
+    if (value === null || value === undefined || value === '') return '—';
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    try {
+        return JSON.stringify(value, null, 2);
+    } catch {
+        return String(value);
+    }
+};
+
+const flattenDetailFields = (value: unknown, prefix = ''): DetailField[] => {
+    if (Array.isArray(value)) {
+        return value.flatMap((item, index) => flattenDetailFields(item, `${prefix}[${index}]`));
+    }
+    if (value !== null && typeof value === 'object') {
+        const entries = Object.entries(value as Record<string, unknown>);
+        if (entries.length === 0) {
+            const path = prefix || 'value';
+            return [{ path, label: humanizeFieldLabel(path), value: '{}', source: null }];
+        }
+        return entries.flatMap(([key, item]) => flattenDetailFields(item, prefix ? `${prefix}.${key}` : key));
+    }
+    const path = prefix || 'value';
+    const rootField = path.split(/[.\[]/)[0];
+    return [{
+        path,
+        label: humanizeFieldLabel(path),
+        value: displayFieldValue(value),
+        source: detailsApplication.value?.form_field_sources?.[rootField] ?? null,
+    }];
+};
+
+const detailFields = computed(() => detailsApplication.value
+    ? flattenDetailFields(detailsApplication.value.form_data)
+    : []);
+
+const detailSourceLabel = (source: string | null): string => {
+    if (detailsApplication.value?.form_field_sources === null) return 'Origin was not recorded';
+    if (source === 'applicant') return 'Entered by the applicant';
+    if (source === 'backend') return 'Supplied by the system';
+    return 'Origin was not recorded';
+};
+
+const openApplicationDetails = async (row: ApplicationRow): Promise<void> => {
+    const requestId = ++detailsRequestId;
+    detailsOpen.value = true;
+    detailsLoading.value = true;
+    detailsError.value = '';
+    detailsApplication.value = null;
+    detailsTargetId.value = row.id;
+    copiedDetailKey.value = null;
+
+    try {
+        const response = await fetch(`/all-applications/${row.id}/details`, {
+            method: 'GET',
+            credentials: 'same-origin',
+            headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        if (!response.ok) {
+            throw new Error(response.status === 403
+                ? 'You are not authorized to view these application details.'
+                : response.status === 404
+                    ? 'Application not found.'
+                    : 'Unable to load application details. Please try again.');
+        }
+        const payload = await response.json() as { application?: ApplicationDetails };
+        if (requestId !== detailsRequestId || !detailsOpen.value) return;
+        if (!payload.application || payload.application.id !== row.id) {
+            throw new Error('The server returned invalid application details.');
+        }
+        detailsApplication.value = payload.application;
+    } catch (error) {
+        if (requestId !== detailsRequestId || !detailsOpen.value) return;
+        detailsError.value = error instanceof Error ? error.message : 'Unable to load application details.';
+    } finally {
+        if (requestId === detailsRequestId) detailsLoading.value = false;
+    }
+};
+
+const closeApplicationDetails = (): void => {
+    detailsRequestId += 1;
+    detailsOpen.value = false;
+    detailsLoading.value = false;
+    detailsError.value = '';
+    detailsApplication.value = null;
+    detailsTargetId.value = null;
+    copiedDetailKey.value = null;
+};
+
+const copyDetail = async (key: string, value: string): Promise<void> => {
+    if (!value || value === '—') return;
+    try {
+        await navigator.clipboard.writeText(value);
+        copiedDetailKey.value = key;
+        window.setTimeout(() => {
+            if (copiedDetailKey.value === key) copiedDetailKey.value = null;
+        }, 1500);
+    } catch {
+        copiedDetailKey.value = null;
+    }
+};
+
+const safePaymentUrl = computed(() => {
+    const raw = detailsApplication.value?.payment_url;
+    if (!raw) return null;
+    try {
+        const url = new URL(raw, window.location.origin);
+        return ['http:', 'https:'].includes(url.protocol) ? url.href : null;
+    } catch {
+        return null;
+    }
+});
 
 const PRODUCT_COUNTDOWN_SECONDS = 180;
 
@@ -591,6 +738,13 @@ onUnmounted(() => {
                                     <span class="max-w-[190px] truncate font-medium text-gray-900 dark:text-gray-100">
                                         {{ forms.find((form) => form.slug === row.form_slug)?.name || row.form_name || row.form_slug }}
                                     </span>
+                                    <button
+                                        type="button"
+                                        class="ml-1 inline-flex shrink-0 items-center rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-blue-700 transition hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-gray-700 dark:text-blue-300 dark:hover:bg-gray-800"
+                                        @click="openApplicationDetails(row)"
+                                    >
+                                        Details
+                                    </button>
                                 </div>
                             </td>
                             <td class="px-4 py-3">
@@ -731,6 +885,110 @@ onUnmounted(() => {
                     <button type="button" class="rounded border px-3 py-2 text-sm" @click="refreshList">Refresh</button>
                 </div>
             </form>
+        </div>
+
+        <div
+            v-if="detailsOpen"
+            class="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-3 sm:p-6"
+            role="presentation"
+            @click.self="closeApplicationDetails"
+            @keydown.esc="closeApplicationDetails"
+        >
+            <section
+                class="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="application-details-title"
+            >
+                <header class="flex items-start justify-between gap-4 border-b border-gray-200 px-5 py-4 dark:border-gray-700">
+                    <div class="min-w-0">
+                        <h2 id="application-details-title" class="text-lg font-semibold text-gray-900 dark:text-gray-100">Application details</h2>
+                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                            <template v-if="detailsApplication">{{ detailsApplication.form_name }} · #{{ detailsApplication.id }}</template>
+                            <template v-else>Loading selected application</template>
+                        </p>
+                    </div>
+                    <button type="button" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white" aria-label="Close application details" @click="closeApplicationDetails">
+                        <X class="h-5 w-5" />
+                    </button>
+                </header>
+
+                <div class="min-h-0 flex-1 overflow-y-auto p-5">
+                    <div v-if="detailsLoading" class="flex items-center justify-center gap-3 py-12 text-sm text-gray-600 dark:text-gray-300">
+                        <span class="h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600 dark:border-gray-600 dark:border-t-blue-400"></span>
+                        Loading application details…
+                    </div>
+                    <div v-else-if="detailsError" class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
+                        <p>{{ detailsError }}</p>
+                        <button v-if="detailsTargetId !== null" type="button" class="mt-3 rounded-lg border border-red-300 px-3 py-1.5 font-medium hover:bg-red-100 dark:border-red-800 dark:hover:bg-red-900/40" @click="() => { const row = rows.find((item) => item.id === detailsTargetId); if (row) openApplicationDetails(row); }">Retry</button>
+                    </div>
+                    <div v-else-if="detailsApplication" class="space-y-6">
+                        <section>
+                            <h3 class="mb-3 text-sm font-semibold text-gray-900 dark:text-gray-100">Applicant information</h3>
+                            <div class="grid gap-3 sm:grid-cols-2">
+                                <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-800">
+                                    <div class="text-xs text-gray-500 dark:text-gray-400">Applicant name</div>
+                                    <div class="mt-1 flex items-start justify-between gap-2 text-sm font-medium text-gray-900 dark:text-gray-100">
+                                        <span class="break-words">{{ detailsApplication.name || '—' }}</span>
+                                        <button type="button" class="shrink-0 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-300" title="Copy applicant name" @click="copyDetail('name', detailsApplication.name || '')">
+                                            <Check v-if="copiedDetailKey === 'name'" class="h-4 w-4 text-green-600" /><Copy v-else class="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-800">
+                                    <div class="text-xs text-gray-500 dark:text-gray-400">Applicant phone</div>
+                                    <div class="mt-1 flex items-start justify-between gap-2 text-sm font-medium text-gray-900 dark:text-gray-100">
+                                        <span class="break-words">{{ detailsApplication.phone || '—' }}</span>
+                                        <button type="button" class="shrink-0 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-300" title="Copy phone" @click="copyDetail('phone', detailsApplication.phone || '')">
+                                            <Check v-if="copiedDetailKey === 'phone'" class="h-4 w-4 text-green-600" /><Copy v-else class="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section>
+                            <div class="mb-3 flex items-center justify-between gap-3">
+                                <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Form data</h3>
+                                <button type="button" class="inline-flex items-center gap-1.5 rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800" @click="copyDetail('form-data', JSON.stringify(detailsApplication.form_data, null, 2))">
+                                    <Check v-if="copiedDetailKey === 'form-data'" class="h-3.5 w-3.5 text-green-600" /><Copy v-else class="h-3.5 w-3.5" />
+                                    Copy all
+                                </button>
+                            </div>
+                            <p v-if="detailFields.length === 0" class="rounded-lg bg-gray-50 p-4 text-sm text-gray-500 dark:bg-gray-800 dark:text-gray-400">No form data was stored for this application.</p>
+                            <div v-else class="divide-y divide-gray-100 rounded-xl border border-gray-200 dark:divide-gray-800 dark:border-gray-700">
+                                <div v-for="field in detailFields" :key="field.path" class="flex flex-col gap-2 p-3 sm:flex-row sm:items-start sm:justify-between">
+                                    <div class="min-w-0 flex-1">
+                                        <div class="text-xs font-semibold text-gray-500 dark:text-gray-400">{{ field.label }}</div>
+                                        <pre class="mt-1 whitespace-pre-wrap break-words font-sans text-sm text-gray-900 dark:text-gray-100">{{ field.value }}</pre>
+                                        <div class="mt-1 text-xs text-gray-400 dark:text-gray-500">{{ detailSourceLabel(field.source) }}</div>
+                                    </div>
+                                    <button type="button" class="inline-flex h-8 w-8 shrink-0 items-center justify-center self-end rounded-md text-gray-500 hover:bg-gray-100 hover:text-blue-600 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-blue-300 sm:self-start" :title="`Copy ${field.label}`" :aria-label="`Copy ${field.label}`" @click="copyDetail(`field-${field.path}`, field.value)">
+                                        <Check v-if="copiedDetailKey === `field-${field.path}`" class="h-4 w-4 text-green-600" /><Copy v-else class="h-4 w-4" />
+                                    </button>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section>
+                            <h3 class="mb-3 text-sm font-semibold text-gray-900 dark:text-gray-100">Payment URL</h3>
+                            <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-800">
+                                <template v-if="safePaymentUrl">
+                                    <a :href="safePaymentUrl" target="_blank" rel="noopener noreferrer" class="break-all text-sm text-blue-700 underline underline-offset-2 hover:text-blue-900 dark:text-blue-300 dark:hover:text-blue-200">{{ detailsApplication.payment_url }}</a>
+                                    <button type="button" class="ml-2 inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-500 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-700" title="Copy payment URL" @click="copyDetail('payment-url', detailsApplication.payment_url || '')">
+                                        <Check v-if="copiedDetailKey === 'payment-url'" class="h-4 w-4 text-green-600" /><Copy v-else class="h-4 w-4" />
+                                    </button>
+                                </template>
+                                <span v-else class="text-sm text-gray-500 dark:text-gray-400">No valid payment URL is available.</span>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+
+                <footer class="flex justify-end border-t border-gray-200 px-5 py-3 dark:border-gray-700">
+                    <button type="button" class="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white" @click="closeApplicationDetails">Close</button>
+                </footer>
+            </section>
         </div>
     </AppLayout>
 </template>
