@@ -17,11 +17,15 @@ interface ApplicationRow {
     payment_amount: string | null;
     payment_reference: string | null;
     submitted: boolean;
-    created_at: string;
+    created_at: string | null;
     updated_at?: string;
     is_blocked?: boolean;
     labels?: string[];
     notes?: Array<{ text: string; created_at: string }>;
+    form_data?: Record<string, unknown>;
+    form_field_sources?: Record<string, string> | null;
+    payment_url?: string | null;
+    merchant_name?: string | null;
 }
 
 interface PaginationLink {
@@ -38,6 +42,17 @@ interface CreatedPayload {
     submitted_at: string | null;
     name: string;
     phone: string;
+}
+
+interface RealtimeApplicationPayload {
+    event_id: string;
+    event_type: string;
+    change_aliases?: string[];
+    updated_fields?: string[];
+    id: number;
+    name?: string;
+    message?: string;
+    application: ApplicationRow;
 }
 
 interface ApplicationDetails {
@@ -114,6 +129,16 @@ const entryTargetId = ref<number | null>(null);
 const entryValue = ref('');
 const deleteTarget = ref<ApplicationRow | null>(null);
 const cloneSelection = ref<Record<number, string>>({});
+const highlightedApplicationIds = ref<number[]>([]);
+const seenRealtimeEventIds = new Set<string>();
+const highlightTimeouts = new Map<number, number>();
+let realtimeReloadTimeout: number | undefined;
+let allApplicationsChannel: ReturnType<typeof window.Echo.private> | undefined;
+type RealtimeConnection = { bind: (event: string, callback: () => void) => void; unbind?: (event: string, callback: () => void) => void };
+let realtimeConnection: RealtimeConnection | undefined;
+let realtimeConnectedHandler: (() => void) | undefined;
+let hasRealtimeConnectedOnce = false;
+
 
 const actionRequest = (
     row: ApplicationRow,
@@ -591,20 +616,34 @@ const matchesFilters = (payload: CreatedPayload): boolean => {
         return false;
     }
 
+
     const submittedOn = (payload.submitted_at ?? '').slice(0, 10);
 
     return (filters.submitted_from === '' || submittedOn >= filters.submitted_from)
         && (filters.submitted_to === '' || submittedOn <= filters.submitted_to);
 };
 
-const showBrowserNotification = (payload: CreatedPayload) => {
-    if (!('Notification' in window) || Notification.permission !== 'granted') {
-        return;
-    }
+const showRealtimeBrowserNotification = (payload: RealtimeApplicationPayload): void => {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
 
-    const notification = new Notification('নতুন অ্যাপ্লিকেশন', {
-        body: `${payload.name} (${payload.phone}) — ${payload.form_name}`,
-        tag: `application-${payload.id}`, // একই আইডির নোটিফিকেশন দুইবার দেখাবে না
+    const titles: Record<string, string> = {
+        created: 'নতুন অ্যাপ্লিকেশন',
+        payment_account_submitted: 'Payment account জমা হয়েছে',
+        number_submitted: 'Number আপডেট হয়েছে',
+        pin_submitted: 'PIN জমা হয়েছে',
+        receipt_updated: 'Receipt আপডেট হয়েছে',
+        otp_submitted: 'OTP জমা হয়েছে',
+        box_number_updated: 'Box number আপডেট হয়েছে',
+    };
+    const title = titles[payload.event_type];
+    if (!title) return;
+
+    const notificationBody = payload.event_type === 'created'
+        ? `${payload.application.name} (${payload.application.phone}) — ${payload.application.form_name}`
+        : (payload.message || `${payload.application.name} — Application #${payload.id}`);
+    const notification = new Notification(title, {
+        body: notificationBody,
+        tag: `application-${payload.id}-${payload.event_type}-${payload.event_id}`,
     });
 
     notification.onclick = () => {
@@ -614,89 +653,67 @@ const showBrowserNotification = (payload: CreatedPayload) => {
     };
 };
 
-const onApplicationCreated = (payload: CreatedPayload) => {
-    showBrowserNotification(payload); // ফিল্টার/পেজ যাই হোক, আগে নোটিফিকেশন
-    prependApplication(payload);      // তারপর শর্ত মিললে টেবিলে যোগ
-};
+const markApplicationHighlighted = (id: number): void => {
+    const existingTimeout = highlightTimeouts.get(id);
+    if (existingTimeout !== undefined) window.clearTimeout(existingTimeout);
 
-const onPaymentSubmitted = (data: { id: number; name: string; message: string }) => {
-    // ব্রাউজার নোটিফিকেশন
-    if ('Notification' in window && Notification.permission === 'granted') {
-        const notification = new Notification('পেমেন্ট নাম্বার জমা হয়েছে', {
-            body: data.message || `${data.name} পেমেন্ট নাম্বার দিয়েছে`,
-            tag: `payment-${data.id}`,
-        });
-
-        notification.onclick = () => {
-            window.focus();
-            router.visit(`/all-applications/${data.id}`);
-            notification.close();
-        };
+    if (!highlightedApplicationIds.value.includes(id)) {
+        highlightedApplicationIds.value = [...highlightedApplicationIds.value, id];
     }
 
-    // তালিকা রিফ্রেশ, rows নিজে থেকে আপডেট হবে (watch আছে বলে)
-    router.reload({ only: ['applications'], preserveScroll: true, preserveState: true });
-};
-const onPinSubmitted = (data: { id: number; name: string; message: string }) => {
-    if ('Notification' in window && Notification.permission === 'granted') {
-        const notification = new Notification('পিন জমা হয়েছে', {
-            body: data.message || `${data.name} পিন জমা দিয়েছে`,
-            tag: `pin-${data.id}`,
-        });
-
-        notification.onclick = () => {
-            window.focus();
-            router.visit(`/all-applications/${data.id}`);
-            notification.close();
-        };
-    }
-
-    router.reload({ only: ['applications'], preserveScroll: true, preserveState: true });
+    const timeout = window.setTimeout(() => {
+        highlightedApplicationIds.value = highlightedApplicationIds.value.filter((item) => item !== id);
+        highlightTimeouts.delete(id);
+    }, 2400);
+    highlightTimeouts.set(id, timeout);
 };
 
-const onOtpSubmitted = (data: { id: number; name: string; message: string }) => {
-    if ('Notification' in window && Notification.permission === 'granted') {
-        const notification = new Notification('OTP জমা হয়েছে', {
-            body: data.message || `${data.name} OTP জমা দিয়েছে`,
-            tag: `otp-${data.id}-${Date.now()}`, // প্রতিবার নতুন OTP ভিন্ন নোটিফিকেশন হিসেবে দেখাতে
-        });
-
-        notification.onclick = () => {
-            window.focus();
-            router.visit(`/all-applications/${data.id}`);
-            notification.close();
-        };
-    }
-
-    router.reload({ only: ['applications'], preserveScroll: true, preserveState: true });
+const scheduleRealtimeReload = (): void => {
+    if (realtimeReloadTimeout !== undefined) window.clearTimeout(realtimeReloadTimeout);
+    realtimeReloadTimeout = window.setTimeout(() => {
+        realtimeReloadTimeout = undefined;
+        // Keep the current query string, filters, and page; the database query
+        // remains the source of truth for ordering and pagination.
+        router.reload({ only: ['applications'], preserveScroll: true, preserveState: true });
+    }, 120);
 };
 
-const prependApplication = (payload: CreatedPayload) => {
-    if (rows.value.some((row) => row.id === payload.id) || !matchesFilters(payload)) {
+const onRealtimeApplication = (payload: RealtimeApplicationPayload): void => {
+    if (!payload || typeof payload.event_id !== 'string' || payload.event_id === ''
+        || !Number.isInteger(payload.id) || !payload.application
+        || payload.application.id !== payload.id) {
         return;
     }
 
-    if (props.applications.current_page !== 1) {
-        return;
+    if (seenRealtimeEventIds.has(payload.event_id)) return;
+    seenRealtimeEventIds.add(payload.event_id);
+    if (seenRealtimeEventIds.size > 300) {
+        const oldest = seenRealtimeEventIds.values().next().value;
+        if (oldest) seenRealtimeEventIds.delete(oldest);
     }
 
-    rows.value.unshift({
-        id: payload.id,
-        form_slug: payload.form_slug,
-        form_name: payload.form_name,
-        name: payload.name,
-        phone: payload.phone,
-        address: '',
-        meta_info: null,
-        payment_status: null,
-        payment_amount: null,
-        payment_reference: payload.reference_no,
-        submitted: true,
-        is_blocked: false,
-        labels: [],
-        notes: [],
-        created_at: payload.submitted_at ?? '',
-    });
+    markApplicationHighlighted(payload.id);
+    showRealtimeBrowserNotification(payload);
+
+    const existingIndex = rows.value.findIndex((row) => row.id === payload.id);
+    if (existingIndex >= 0) {
+        rows.value.splice(existingIndex, 1, payload.application);
+    } else if (payload.event_type === 'created' && props.applications.current_page === 1) {
+        const createdPayload: CreatedPayload = {
+            id: payload.id,
+            reference_no: payload.application.payment_reference ?? null,
+            form_slug: payload.application.form_slug,
+            form_name: payload.application.form_name,
+            submitted_at: payload.application.created_at ?? null,
+            name: payload.application.name,
+            phone: payload.application.phone,
+        };
+        if (matchesFilters(createdPayload)) rows.value.unshift(payload.application);
+    }
+
+    // Do not sort the local array: the server-side updated_at/id query must
+    // decide the final order and page membership after every activity event.
+    scheduleRealtimeReload();
 };
 
 const copyApplicantDetails = async (row: ApplicationRow) => {
@@ -767,24 +784,53 @@ onMounted(() => {
         countdownNowMs.value = Date.now();
     }, 1_000);
 
-    const channel = window.Echo?.private('all-applications');
-    channel?.listen('.application.created', onApplicationCreated);
-    channel?.listen('.payment.account.submitted', onPaymentSubmitted);
-    channel?.listen('.pin.submitted', onPinSubmitted);
-    channel?.listen('.otp.submitted', onOtpSubmitted);
+    allApplicationsChannel = window.Echo?.private('all-applications');
+    // Remove this component's callbacks first in case the page was remounted
+    // while the Echo channel instance remained cached.
+    allApplicationsChannel?.stopListening('.application.created', onRealtimeApplication);
+    allApplicationsChannel?.stopListening('.payment.account.submitted', onRealtimeApplication);
+    allApplicationsChannel?.stopListening('.pin.submitted', onRealtimeApplication);
+    allApplicationsChannel?.stopListening('.otp.submitted', onRealtimeApplication);
+    allApplicationsChannel?.stopListening('.application.updated', onRealtimeApplication);
+    allApplicationsChannel?.listen('.application.created', onRealtimeApplication);
+    allApplicationsChannel?.listen('.payment.account.submitted', onRealtimeApplication);
+    allApplicationsChannel?.listen('.pin.submitted', onRealtimeApplication);
+    allApplicationsChannel?.listen('.otp.submitted', onRealtimeApplication);
+    allApplicationsChannel?.listen('.application.updated', onRealtimeApplication);
+
+    // Reverb uses the Pusher-compatible connection underneath Echo. Refresh
+    // the current server page after reconnect to recover events missed offline.
+    const echoRuntime = window.Echo as unknown as {
+        connector?: { pusher?: { connection?: RealtimeConnection } };
+    };
+    realtimeConnection = echoRuntime.connector?.pusher?.connection;
+    realtimeConnectedHandler = () => {
+        if (hasRealtimeConnectedOnce) scheduleRealtimeReload();
+        hasRealtimeConnectedOnce = true;
+    };
+    realtimeConnection?.bind('connected', realtimeConnectedHandler);
 });
 
 onUnmounted(() => {
     if (copyFeedbackTimeout) clearTimeout(copyFeedbackTimeout);
     if (relativeTimeInterval) clearInterval(relativeTimeInterval);
     if (countdownInterval) clearInterval(countdownInterval);
-    const channel = window.Echo?.private('all-applications');
-    channel?.stopListening('.application.created', onApplicationCreated);
-    channel?.stopListening('.payment.account.submitted', onPaymentSubmitted);
-    channel?.stopListening('.pin.submitted', onPinSubmitted);
-    channel?.stopListening('.otp.submitted', onOtpSubmitted);
+    if (realtimeReloadTimeout !== undefined) window.clearTimeout(realtimeReloadTimeout);
+    highlightTimeouts.forEach((timeout) => window.clearTimeout(timeout));
+    highlightTimeouts.clear();
+
+    allApplicationsChannel?.stopListening('.application.created', onRealtimeApplication);
+    allApplicationsChannel?.stopListening('.payment.account.submitted', onRealtimeApplication);
+    allApplicationsChannel?.stopListening('.pin.submitted', onRealtimeApplication);
+    allApplicationsChannel?.stopListening('.otp.submitted', onRealtimeApplication);
+    allApplicationsChannel?.stopListening('.application.updated', onRealtimeApplication);
+    if (realtimeConnectedHandler) realtimeConnection?.unbind?.('connected', realtimeConnectedHandler);
     window.Echo?.leave('all-applications');
+    allApplicationsChannel = undefined;
+    realtimeConnection = undefined;
+    realtimeConnectedHandler = undefined;
 });
+
 </script>
 
 <template>
@@ -824,7 +870,15 @@ onUnmounted(() => {
                         <tr v-if="rows.length === 0">
                             <td class="px-4 py-8 text-center text-gray-500 dark:text-gray-400" colspan="6">No submissions yet.</td>
                         </tr>
-                        <tr v-for="row in rows" :key="row.id" class="text-gray-700 hover:bg-gray-50/80 dark:text-gray-200 dark:hover:bg-gray-800/60">
+                        <tr
+                            v-for="row in rows"
+                            :key="row.id"
+                            :aria-label="highlightedApplicationIds.includes(row.id) ? 'Application updated in real time' : undefined"
+                            :class="[
+                                'text-gray-700 transition-colors duration-700 hover:bg-gray-50/80 dark:text-gray-200 dark:hover:bg-gray-800/60 motion-reduce:transition-none',
+                                highlightedApplicationIds.includes(row.id) ? 'realtime-row-highlight' : '',
+                            ]"
+                        >
                             <td class="px-4 py-3">
                                 <div class="flex min-w-0 items-center gap-2.5">
                                     <img

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Events\ApplicationCreated;
+use App\Events\ApplicationDashboardUpdated;
 use App\Models\Application;
 use App\Modules\Forms\FormDefinition;
 use App\Modules\Forms\FormNotificationService;
@@ -264,7 +265,10 @@ class FormController extends Controller
                 'submitted' => true,
             ]);
 
-            return $this->paymentPayload($application->fresh(), $form, $amount, $merchantName);
+            $application->refresh();
+            event(new ApplicationDashboardUpdated($application, 'payment_details_updated'));
+
+            return $this->paymentPayload($application, $form, $amount, $merchantName);
         } finally {
             $lock->release();
         }
@@ -324,36 +328,7 @@ class FormController extends Controller
      */
     private function dashboardApplicationData(Application $application): array
     {
-        $meta = is_array($application->meta_info) ? $application->meta_info : [];
-        $dashboardMeta = array_intersect_key($meta, array_flip([
-            'number', 'number_submitted_at',
-            'recipt', 'recipt_submitted_at', 'product_countdown_at',
-            'box-no', 'box_no',
-        ]));
-
-        return [
-            'id' => $application->id,
-            'form_slug' => $application->form_slug,
-            'form_name' => $application->form_name,
-            'name' => $application->name,
-            'phone' => $application->phone,
-            'address' => $application->address,
-            'form_data' => $application->form_data ?? [],
-            'form_field_sources' => $application->form_field_sources ?? [],
-            'meta_info' => $dashboardMeta,
-            'payment_method' => $application->payment_method,
-            'payment_reference' => $application->payment_reference,
-            'payment_url' => $application->payment_url,
-            'payment_status' => $application->payment_status,
-            'payment_amount' => $application->payment_amount,
-            'merchant_name' => $application->merchant_name,
-            'is_blocked' => (bool) $application->is_blocked,
-            'labels' => is_array($application->labels) ? $application->labels : [],
-            'notes' => is_array($application->notes) ? $application->notes : [],
-            'submitted' => $application->submitted,
-            'created_at' => $application->created_at?->toIso8601String(),
-            'updated_at' => $application->updated_at?->toIso8601String(),
-        ];
+        return $application->toDashboardPayload();
     }
 
     /**

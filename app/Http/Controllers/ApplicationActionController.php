@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Events\ApplicationDashboardUpdated;
 use App\Models\Application;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,6 +21,7 @@ class ApplicationActionController extends Controller
         ]);
 
         $application->update($validated);
+        event(new ApplicationDashboardUpdated($application->refresh(), 'details_updated'));
 
         return back()->with('success', 'Application information updated.');
     }
@@ -27,6 +29,7 @@ class ApplicationActionController extends Controller
     public function toggleBlock(Application $application): RedirectResponse
     {
         $application->update(['is_blocked' => ! $application->is_blocked]);
+        event(new ApplicationDashboardUpdated($application->refresh(), $application->is_blocked ? 'blocked' : 'unblocked'));
 
         return back()->with('success', $application->is_blocked
             ? 'Application blocked successfully.'
@@ -61,6 +64,8 @@ class ApplicationActionController extends Controller
             $locked->save();
         });
 
+        event(new ApplicationDashboardUpdated($application->refresh(), 'label_added'));
+
         return back()->with('success', 'Label added.');
     }
 
@@ -80,6 +85,8 @@ class ApplicationActionController extends Controller
             $locked->notes = array_slice($notes, -100);
             $locked->save();
         });
+
+        event(new ApplicationDashboardUpdated($application->refresh(), 'note_added'));
 
         return back()->with('success', 'Note added.');
     }

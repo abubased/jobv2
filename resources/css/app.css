@@ -194,3 +194,19 @@ p.text-\[15px\].text-gray-800.font-semibold {
 header.sticky.top-0.z-30.px-4.pt-4.pb-3.flex.items-center.justify-between.border-b.border-\[\#e5e7eb\].bg-\[\#65cf7294\].backdrop-blur {
     background: rgb(188, 255, 251);
 }
+
+
+/* Accessible, temporary realtime row feedback; remains visible in dark mode. */
+.realtime-row-highlight {
+    background-color: rgb(254 243 199 / 0.92);
+}
+
+.dark .realtime-row-highlight {
+    background-color: rgb(120 53 15 / 0.42);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .realtime-row-highlight {
+        transition: background-color 1.8s ease-out;
+    }
+}

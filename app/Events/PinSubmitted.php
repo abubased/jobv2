@@ -8,20 +8,22 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Contracts\Broadcasting\ShouldRescue;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Str;
 
 class PinSubmitted implements ShouldBroadcastNow, ShouldRescue
 {
     use Dispatchable, SerializesModels;
 
-    public function __construct(
-        public Application $application,
-    ) {}
+    private string $eventId;
+
+    public function __construct(public Application $application)
+    {
+        $this->eventId = (string) Str::uuid();
+    }
 
     public function broadcastOn(): array
     {
-        return [
-            new PrivateChannel('all-applications'),    // AllApplications পেজের চ্যানেল
-        ];
+        return [new PrivateChannel('all-applications')];
     }
 
     public function broadcastAs(): string
@@ -32,9 +34,14 @@ class PinSubmitted implements ShouldBroadcastNow, ShouldRescue
     public function broadcastWith(): array
     {
         return [
-            'id'      => $this->application->id,
-            'name'    => $this->application->name,
-            'message' => "{$this->application->name} পিন জমা দিয়েছেন",
+            'event_id' => $this->eventId,
+            'event_type' => 'pin_submitted',
+            'change_aliases' => ['receipt_updated'],
+            'updated_fields' => ['recipt', 'recipt_submitted_at'],
+            'id' => (int) $this->application->id,
+            'name' => $this->application->name,
+            'message' => 'PIN submitted / Receipt updated',
+            'application' => $this->application->toDashboardPayload(),
         ];
     }
 }

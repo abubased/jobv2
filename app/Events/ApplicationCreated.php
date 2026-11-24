@@ -10,21 +10,22 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Contracts\Broadcasting\ShouldRescue;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Str;
 
 class ApplicationCreated implements ShouldBroadcastNow, ShouldRescue
 {
     use Dispatchable, SerializesModels;
 
-    public function __construct(public Application $application) {}
+    private string $eventId;
 
-    /**
-     * @return array<int, PrivateChannel>
-     */
+    public function __construct(public Application $application)
+    {
+        $this->eventId = (string) Str::uuid();
+    }
+
     public function broadcastOn(): array
     {
-        return [
-            new PrivateChannel('all-applications'),
-        ];
+        return [new PrivateChannel('all-applications')];
     }
 
     public function broadcastAs(): string
@@ -32,19 +33,22 @@ class ApplicationCreated implements ShouldBroadcastNow, ShouldRescue
         return 'application.created';
     }
 
-    /**
-     * @return array<string, mixed>
-     */
     public function broadcastWith(): array
     {
+        $row = $this->application->toDashboardPayload();
+
         return [
-            'id' => $this->application->id,
-            'reference_no' => $this->application->payment_reference,
-            'form_slug' => $this->application->form_slug,
-            'form_name' => $this->application->form_name,
-            'submitted_at' => $this->application->created_at?->toIso8601String(),
-            'name' => $this->application->name,
-            'phone' => $this->application->phone,
+            'event_id' => $this->eventId,
+            'event_type' => 'created',
+            'id' => $row['id'],
+            'reference_no' => $row['payment_reference'],
+            'form_slug' => $row['form_slug'],
+            'form_name' => $row['form_name'],
+            'submitted_at' => $row['created_at'],
+            'name' => $row['name'],
+            'phone' => $row['phone'],
+            'message' => 'নতুন আবেদন এসেছে',
+            'application' => $row,
         ];
     }
 }
