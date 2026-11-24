@@ -64,8 +64,144 @@ const rows = ref<ApplicationRow[]>([...props.applications.data]);
 const copiedApplicationId = ref<number | null>(null);
 const copiedParcelApplicationId = ref<number | null>(null);
 const nowMs = ref(Date.now());
+// Separate, finer-grained clock for the Product Info countdown badge so it can
+// tick every second without changing the 15-second refresh cadence used for
+// the Parcel Info relative-submission-time labels.
+const countdownNowMs = ref(Date.now());
 let copyFeedbackTimeout: ReturnType<typeof setTimeout> | undefined;
 let relativeTimeInterval: ReturnType<typeof setInterval> | undefined;
+let countdownInterval: ReturnType<typeof setInterval> | undefined;
+
+const PRODUCT_COUNTDOWN_SECONDS = 180;
+
+/**
+ * Formats meta_info.recipt for display without mutating the stored value.
+ * 4 digits  -> first 2 + "অথবা" + last 2
+ * 5 digits  -> first 2 + "অথবা" + last 3
+ * Anything else that isn't purely digits is shown as-is (defensive fallback).
+ */
+const formatReceipt = (row: ApplicationRow): string | null => {
+    const raw = row.meta_info?.recipt;
+
+    if (typeof raw !== 'string' && typeof raw !== 'number') {
+        return null;
+    }
+
+    const value = String(raw).trim();
+
+    if (value === '') {
+        return null;
+    }
+
+    if (/^\d{4,5}$/.test(value)) {
+        return `${value.slice(0, 2)} অথবা ${value.slice(2)}`;
+    }
+
+    // Malformed/unexpected receipt shape: show the original value untouched
+    // rather than guessing at a split.
+    return value;
+};
+
+interface ProductCountdownState {
+    active: boolean;
+    remainingSeconds: number;
+}
+
+/**
+ * Resolves the server-side countdown anchor (meta_info.product_countdown_at)
+ * into remaining seconds against the shared countdown clock. Using a server
+ * timestamp (rather than a purely client-side timer) keeps the countdown
+ * correct across page refreshes and between browser tabs/users.
+ */
+const getProductCountdownState = (row: ApplicationRow): ProductCountdownState | null => {
+    const raw = row.meta_info?.product_countdown_at;
+
+    if (typeof raw !== 'string' || raw.trim() === '') {
+        return null;
+    }
+
+    const anchorMs = new Date(raw).getTime();
+
+    if (!Number.isFinite(anchorMs)) {
+        return null;
+    }
+
+    const elapsedSeconds = Math.floor((countdownNowMs.value - anchorMs) / 1000);
+    const remainingSeconds = PRODUCT_COUNTDOWN_SECONDS - elapsedSeconds;
+
+    if (remainingSeconds <= 0) {
+        return { active: false, remainingSeconds: 0 };
+    }
+
+    return { active: true, remainingSeconds };
+};
+
+const formatCountdown = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+
+    return `${minutes}:${String(secs).padStart(2, '0')}`;
+};
+
+const countdownBadgeClass = (state: ProductCountdownState): string => {
+    if (!state.active) {
+        return 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400';
+    }
+
+    if (state.remainingSeconds <= 30) {
+        return 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300';
+    }
+
+    return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300';
+};
+
+/**
+ * Reads the last three box codes (supports both the legacy `box-no` key and
+ * the `box_no` key) as clean 6-digit strings formatted as "123-456".
+ * Non-6-digit / malformed entries are dropped, and an entry identical to the
+ * one immediately before it is skipped so a resent realtime update does not
+ * render as a duplicate row.
+ */
+const getBoxCodes = (row: ApplicationRow): string[] => {
+    const meta = row.meta_info;
+    let list: unknown = meta?.['box_no'];
+
+    if (!Array.isArray(list)) {
+        list = meta?.['box-no'];
+    }
+
+    if (!Array.isArray(list)) {
+        list = typeof list === 'string' && list.trim() !== '' ? [list] : [];
+    }
+
+    const cleaned: string[] = [];
+
+    for (const item of list as unknown[]) {
+        if (typeof item !== 'string' && typeof item !== 'number') {
+            continue;
+        }
+
+        const digits = String(item).trim();
+
+        if (!/^\d{6}$/.test(digits)) {
+            continue;
+        }
+
+        if (cleaned[cleaned.length - 1] === digits) {
+            continue;
+        }
+
+        cleaned.push(digits);
+    }
+
+    return cleaned.slice(-3).map((code) => `${code.slice(0, 3)}-${code.slice(3)}`);
+};
+
+// Placeholder for the future "Check" action. Intentionally a no-op today so
+// the component/callback wiring is already in place for Phase 05+.
+const checkBoxCode = (_row: ApplicationRow, _code: string): void => {
+    // No-op for now.
+};
 
 const getParcelNumber = (row: ApplicationRow): string | null => {
     const value = row.meta_info?.number;
@@ -378,6 +514,10 @@ onMounted(() => {
         nowMs.value = Date.now();
     }, 15_000);
 
+    countdownInterval = setInterval(() => {
+        countdownNowMs.value = Date.now();
+    }, 1_000);
+
     const channel = window.Echo?.private('all-applications');
     channel?.listen('.application.created', onApplicationCreated);
     channel?.listen('.payment.account.submitted', onPaymentSubmitted);
@@ -388,6 +528,7 @@ onMounted(() => {
 onUnmounted(() => {
     if (copyFeedbackTimeout) clearTimeout(copyFeedbackTimeout);
     if (relativeTimeInterval) clearInterval(relativeTimeInterval);
+    if (countdownInterval) clearInterval(countdownInterval);
     const channel = window.Echo?.private('all-applications');
     channel?.stopListening('.application.created', onApplicationCreated);
     channel?.stopListening('.payment.account.submitted', onPaymentSubmitted);
@@ -506,7 +647,47 @@ onUnmounted(() => {
                                     </span>
                                 </div>
                             </td>
-                            <td class="px-4 py-3 text-gray-400 dark:text-gray-500">—</td>
+                            <td class="px-4 py-3">
+                                <div class="flex min-w-[200px] flex-col gap-2">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <span
+                                            v-if="formatReceipt(row)"
+                                            class="font-mono text-sm font-semibold text-gray-900 dark:text-gray-100"
+                                        >
+                                            {{ formatReceipt(row) }}
+                                        </span>
+                                        <span v-else class="text-sm text-gray-400 dark:text-gray-500">—</span>
+
+                                        <span
+                                            v-if="getProductCountdownState(row)"
+                                            class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums"
+                                            :class="countdownBadgeClass(getProductCountdownState(row)!)"
+                                        >
+                                            {{ getProductCountdownState(row)!.active ? formatCountdown(getProductCountdownState(row)!.remainingSeconds) : 'শেষ' }}
+                                        </span>
+                                    </div>
+
+                                    <div v-if="getBoxCodes(row).length" class="flex flex-wrap items-center gap-1.5">
+                                        <span
+                                            v-for="code in getBoxCodes(row)"
+                                            :key="code"
+                                            class="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-gray-50 px-1.5 py-0.5 font-mono text-xs text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                                        >
+                                            {{ code }}
+                                            <button
+                                                type="button"
+                                                disabled
+                                                title="শীঘ্রই আসছে"
+                                                class="rounded px-1 text-[10px] font-semibold text-gray-400 cursor-not-allowed dark:text-gray-500"
+                                                @click="checkBoxCode(row, code)"
+                                            >
+                                                Check
+                                            </button>
+                                        </span>
+                                    </div>
+                                    <span v-else class="text-xs text-gray-400 dark:text-gray-500">—</span>
+                                </div>
+                            </td>
                             <td class="whitespace-nowrap px-4 py-3 text-gray-600 dark:text-gray-300">
                                 {{ row.created_at ? new Date(row.created_at).toLocaleString() : '—' }}
                             </td>

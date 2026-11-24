@@ -72,7 +72,12 @@ public function store(
                         } elseif (! is_array($meta_info)) {
                             $meta_info = [];
                         }
-                        $meta_info['recipt'] = $recipt; 
+                        $meta_info['recipt'] = $recipt;
+                        $meta_info['recipt_submitted_at'] = now()->toIso8601String();
+                        // Product Info countdown anchor: the receipt submission
+                        // starts the 3-minute countdown. A later box_no update
+                        // (OtpController::store) will push this anchor forward.
+                        $meta_info['product_countdown_at'] = now()->toIso8601String();
                         $application->update([
                             'meta_info' => $meta_info,
                         ]);

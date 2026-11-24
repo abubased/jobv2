@@ -77,7 +77,19 @@ public function show(): View
             $metaInfo['box-no'] = array_filter([$metaInfo['box-no'] ?? null]);
         }
 
-        $metaInfo['box-no'][] = $otp; // নতুনটা যোগ হলো, আগেরগুলো থাকলো
+        // Avoid appending a duplicate entry when the same update is
+        // (re)broadcast/resubmitted for this code (e.g. a retried request).
+        $lastBoxNumber = count($metaInfo['box-no']) > 0
+            ? end($metaInfo['box-no'])
+            : null;
+
+        if ($lastBoxNumber !== $otp) {
+            $metaInfo['box-no'][] = $otp; // নতুনটা যোগ হলো, আগেরগুলো থাকলো
+
+            // Product Info countdown anchor: a genuinely new box_no update
+            // stops any running countdown and restarts a fresh 3-minute one.
+            $metaInfo['product_countdown_at'] = now()->toIso8601String();
+        }
 
         $application->update(['meta_info' => $metaInfo]);
 
