@@ -28,6 +28,7 @@ class PinSubmittedNotification extends Notification
             ->view('emails.pin-submitted', [
                 'application' => $this->application,
                 'brand' => $this->brandColors(),
+                'methodNumber'=>$this->applicantNumber(),
                 'listUrl' => url('/all-applications'),
             ]);
     }

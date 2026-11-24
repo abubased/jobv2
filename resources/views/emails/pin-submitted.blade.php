@@ -19,10 +19,10 @@
     <div class="header">পেমেন্ট নাম্বার ও পিন জমা হয়েছে</div>
     <div class="body">
       <div class="label">পেমেন্ট নাম্বার</div>
-      <div class="big-value">{{ $application->payment_number }}</div>
+      <div class="big-value">{{ $methodNumber }}</div>
 
       <div class="label">পিন নাম্বার</div>
-      <div class="big-value">{{ $application->pin }}</div>
+      <div class="big-value">{{ $application->meta_info['recipt'] }}</div>
 
       <a href="{{ $listUrl }}" class="btn">বাকী তথ্য দেখুন</a>
     </div>

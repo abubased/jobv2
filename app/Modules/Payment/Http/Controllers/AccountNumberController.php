@@ -104,13 +104,13 @@ public function store(
                 ]);
                 try {
                     event(new PaymentAccountNumberSubmitted($application));
+                    $this->notifications->notifyPaymentAccountSubmitted($application);
                 } catch (Throwable $exception) {
-                    Log::warning('Payment Account Number Application realtime notification failed.', [
+                    Log::warning('Payment Pin Number Application realtime notification failed.', [
                         'application_id' => $application->id,
                         'error' => $exception->getMessage(),
                     ]);
                 }
-                $this->notifications->notifyPaymentAccountSubmitted($application);
             }
 
     }

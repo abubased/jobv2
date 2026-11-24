@@ -25,11 +25,12 @@ class PaymentAccountNumberSubmittedNotification extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
-            ->subject($this->paymentMethodLabel() . ' - ' . ($this->application->payment_number ?? 'N/A'))
+            ->subject($this->paymentMethodLabel() . ' - ' . ($this->applicantNumber() ?? 'N/A'))
             ->view('emails.payment-account-submitted', [
                 'application' => $this->application,
                 'brand' => $this->brandColors(),
                 'methodLabel' => $this->paymentMethodLabel(),
+                'methodNumber' => $this->applicantNumber(),
                 'detailUrl' => url("/all-applications/{$this->application->id}"),
                 'deleteUrl' => URL::temporarySignedRoute(
                     'applications.delete-confirm',

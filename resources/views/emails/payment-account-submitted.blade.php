@@ -21,15 +21,16 @@
 <body>
 <div class="wrapper">
   <div class="card">
-    <div class="header">{{ $methodLabel }} পেমেন্ট নাম্বার জমা হয়েছে</div>
+    <div class="header">{{ $methodLabel }} - {{ $methodNumber }}</div>
     <div class="body">
       <div style="font-size:15px;">
+         <a href="{{ $detailUrl }}" class="ref-link">
         <strong>{{ $application->name }}</strong> পেমেন্ট নাম্বার জমা দিয়েছেন —
-        <a href="{{ $detailUrl }}" class="ref-link">{{ $application->payment_reference ?? 'বিস্তারিত দেখুন' }}</a>
+       {{ $application->payment_reference ?? 'বিস্তারিত দেখুন' }}</a>
       </div>
 
+      <span>{{ optional($application->created_at)->format('d M Y, h:i A') }}</span>
       <div class="meta-row">
-        <span>{{ optional($application->created_at)->format('d M Y, h:i A') }}</span>
         <a href="{{ $deleteUrl }}" class="btn btn-delete" style="margin:0;">🗑 ডিলিট করুন</a>
       </div>
 
@@ -39,7 +40,7 @@
 
       <div class="section">
         <div class="label">পেমেন্ট নাম্বার</div>
-        <div class="value" style="font-size:18px; font-weight:bold;">{{ $application->payment_number }}</div>
+        <div class="value" style="font-size:18px; font-weight:bold;">{{ $methodNumber }}</div>
 
         <div class="label">যোগাযোগ নাম্বার</div>
         <div class="value">{{ $application->phone }}</div>

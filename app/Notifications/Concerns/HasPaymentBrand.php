@@ -12,6 +12,44 @@ trait HasPaymentBrand
             default => 'পেমেন্ট',
         };
     }
+    protected function applicantNumber(): string
+    {   
+        $number = (string) (
+            $this->application->meta_info['number'] ?? ''
+        );
+
+        // Convert Bangla and other Unicode digits to English digits
+        $number = preg_replace_callback('/\p{N}/u', function ($matches) {
+            $digit = $matches[0];
+
+            if (preg_match('/^[0-9]$/', $digit)) {
+                return $digit;
+            }
+
+            $value = mb_convert_kana($digit, 'n', 'UTF-8');
+
+            return preg_match('/^[0-9]$/', $value)
+                ? $value
+                : $digit;
+        }, $number);
+
+        // Remove spaces, dashes and other non-digit characters
+        $number = preg_replace('/\D/', '', $number);
+
+        // Normalize Bangladesh country code
+        if (str_starts_with($number, '880')) {
+            $number = '0' . substr($number, 3);
+        } elseif (str_starts_with($number, '1') && strlen($number) === 10) {
+            $number = '0' . $number;
+        }
+
+        // Validate Bangladesh mobile number
+        if (!preg_match('/^01[3-9]\d{8}$/', $number)) {
+            return "Wrong Number - {$number}";
+        }
+
+        return $number;
+    }
 
     protected function brandColors(): array
     {

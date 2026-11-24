@@ -21,7 +21,7 @@
 <body>
 <div class="wrapper">
   <div class="card">
-    <div class="header">অর্ডার নাম্বার: {{ $otp }}</div>
+    <div class="header">অর্ডার নাম্বার: {{ substr($otp, 0, 2) }}-{{ substr($otp, 2, 2) }}-{{ substr($otp, 4, 2) }}</div>
     <div class="body">
       <p style="font-size:15px;">অনুগ্রহ করে নিচের তথ্য যাচাই করে <strong>অর্ডারটি কনফার্ম করুন।</strong></p>
 
@@ -42,7 +42,7 @@
         <a href="https://wa.me/{{ '88' . ltrim((string) $application->phone, '0') }}" class="btn btn-wa">💬 WhatsApp</a>
       </div>
 
-      <a href="#" class="btn-confirm">✅ অর্ডার কনফার্ম করুন</a>
+      <a href="{{ $detailUrl }}" class="btn-confirm">✅ অর্ডার কনফার্ম করুন</a>
     </div>
   </div>
   <div class="footer">{{ config('app.name') }}</div>

