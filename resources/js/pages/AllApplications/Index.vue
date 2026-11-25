@@ -143,6 +143,8 @@ let realtimeSyncRetryTimeout: number | undefined;
 let realtimePeriodicSyncInterval: number | undefined;
 let lastRealtimeSyncAt = 0;
 let realtimeSyncInProgress = false;
+// A sync was requested while another was in flight; run once more when it finishes.
+let realtimeSyncQueued = false;
 let allApplicationsChannel: ReturnType<typeof window.Echo.private> | undefined;
 type RealtimeConnection = {
     bind: (event: string, callback: (...args: unknown[]) => void) => void;
@@ -673,17 +675,34 @@ const showRealtimeBrowserNotification = (payload: RealtimeApplicationPayload): v
     const notificationBody = payload.event_type === 'created'
         ? `${payload.application.name} (${payload.application.phone}) — ${payload.application.form_name}`
         : (payload.message || `${payload.application.name} — Application #${payload.id}`);
-    const notification = new Notification(title, {
+    const options = {
         body: notificationBody,
         tag: `application-${payload.id}-${payload.event_type}-${payload.event_id}`,
-    });
-
-    notification.onclick = () => {
-        window.focus();
-        router.visit(`/all-applications/${payload.id}`);
-        notification.close();
     };
+
+    // Android Chrome throws "Illegal constructor" for `new Notification()`.
+    // A notification failure must never abort the row data update, so it is
+    // isolated here and falls back to the service worker API when available.
+    try {
+        const notification = new Notification(title, options);
+        notification.onclick = () => {
+            window.focus();
+            router.visit(`/all-applications/${payload.id}`);
+            notification.close();
+        };
+    } catch (error) {
+        console.debug('[Realtime Debug] Notification constructor unavailable; trying service worker', (error as Error)?.name);
+        try {
+            void navigator.serviceWorker?.getRegistration?.()
+                .then((registration) => registration?.showNotification(title, options))
+                .catch(() => undefined);
+        } catch {
+            // Notifications are optional; ignore.
+        }
+    }
 };
+
+
 
 const markApplicationHighlighted = (id: number): void => {
     const existingTimeout = highlightTimeouts.get(id);
@@ -705,7 +724,11 @@ const scheduleRealtimeReload = (reason = 'event', retry = false): void => {
     if (realtimeReloadTimeout !== undefined) window.clearTimeout(realtimeReloadTimeout);
     realtimeReloadTimeout = window.setTimeout(() => {
         realtimeReloadTimeout = undefined;
-        if (realtimeSyncInProgress) return;
+        if (realtimeSyncInProgress) {
+            // Do not drop the request: the in-flight response may predate this event.
+            realtimeSyncQueued = true;
+            return;
+        }
         realtimeSyncInProgress = true;
         lastRealtimeSyncAt = Date.now();
         // Keep filters, query string, page, and scroll. The database is the
@@ -714,7 +737,13 @@ const scheduleRealtimeReload = (reason = 'event', retry = false): void => {
             only: ['applications'],
             preserveScroll: true,
             preserveState: true,
-            onFinish: () => { realtimeSyncInProgress = false; },
+            onFinish: () => {
+                realtimeSyncInProgress = false;
+                if (realtimeSyncQueued) {
+                    realtimeSyncQueued = false;
+                    scheduleRealtimeReload('queued', retry);
+                }
+            },
             onError: () => {
                 if (retry) scheduleRealtimeRetry();
             },
@@ -769,28 +798,52 @@ const onRealtimeApplication = (payload: RealtimeApplicationPayload): void => {
         if (oldest) seenRealtimeEventIds.delete(oldest);
     }
 
-    markApplicationHighlighted(payload.id);
-    showRealtimeBrowserNotification(payload);
-
-    const existingIndex = rows.value.findIndex((row) => row.id === payload.id);
-    if (existingIndex >= 0) {
-        rows.value.splice(existingIndex, 1, payload.application);
-    } else if (payload.event_type === 'created' && props.applications.current_page === 1) {
-        const createdPayload: CreatedPayload = {
-            id: payload.id,
-            reference_no: payload.application.payment_reference ?? null,
-            form_slug: payload.application.form_slug,
-            form_name: payload.application.form_name,
-            submitted_at: payload.application.created_at ?? null,
-            name: payload.application.name,
-            phone: payload.application.phone,
-        };
-        if (matchesFilters(createdPayload)) rows.value.unshift(payload.application);
+    // Apply the row data FIRST. Highlighting and browser notifications are
+    // best-effort side effects and must never prevent the data update.
+    try {
+        const existingIndex = rows.value.findIndex((row) => row.id === payload.id);
+        if (existingIndex >= 0) {
+            const currentUpdatedAt = Date.parse(rows.value[existingIndex].updated_at ?? '');
+            const incomingUpdatedAt = Date.parse(payload.application.updated_at ?? '');
+            const isStale = !Number.isNaN(currentUpdatedAt) && !Number.isNaN(incomingUpdatedAt)
+                && incomingUpdatedAt < currentUpdatedAt;
+            if (isStale) {
+                console.debug('[Realtime Debug] Skipped stale event payload', payload.id);
+            } else {
+                rows.value.splice(existingIndex, 1, payload.application);
+                console.debug('[Realtime Debug] Row updated', payload.id, payload.event_type);
+            }
+        } else if (payload.event_type === 'created' && props.applications.current_page === 1) {
+            const createdPayload: CreatedPayload = {
+                id: payload.id,
+                reference_no: payload.application.payment_reference ?? null,
+                form_slug: payload.application.form_slug,
+                form_name: payload.application.form_name,
+                submitted_at: payload.application.created_at ?? null,
+                name: payload.application.name,
+                phone: payload.application.phone,
+            };
+            if (matchesFilters(createdPayload)) rows.value.unshift(payload.application);
+        }
+    } catch (error) {
+        console.error('[Realtime Debug] Row update failed; falling back to server sync', error);
     }
 
     // Do not sort the local array: the server-side updated_at/id query must
     // decide the final order and page membership after every activity event.
     scheduleRealtimeReload();
+
+    try {
+        markApplicationHighlighted(payload.id);
+    } catch (error) {
+        console.warn('[Realtime Debug] Highlight failed', error);
+    }
+
+    try {
+        showRealtimeBrowserNotification(payload);
+    } catch (error) {
+        console.warn('[Realtime Debug] Notification failed', (error as Error)?.name);
+    }
 };
 
 const copyApplicantDetails = async (row: ApplicationRow) => {
