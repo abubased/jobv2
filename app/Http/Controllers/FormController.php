@@ -64,6 +64,7 @@ class FormController extends Controller
                 'form_name' => $application->form_name,
                 'name' => $application->name,
                 'phone' => $application->phone,
+                'address' => $application->address,
                 'form_data' => is_array($application->form_data) ? $application->form_data : [],
                 'form_field_sources' => is_array($application->form_field_sources)
                     ? $application->form_field_sources

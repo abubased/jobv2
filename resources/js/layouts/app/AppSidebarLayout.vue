@@ -7,10 +7,14 @@ import type { BreadcrumbItemType } from '@/types';
 
 interface Props {
     breadcrumbs?: BreadcrumbItemType[];
+    realtimeStatus?: 'connected' | 'disconnected' | 'reconnecting';
+    realtimeStatusLabel?: { badge: string; text: string };
 }
 
 withDefaults(defineProps<Props>(), {
     breadcrumbs: () => [],
+    realtimeStatus: undefined,
+    realtimeStatusLabel: undefined,
 });
 </script>
 
@@ -18,7 +22,7 @@ withDefaults(defineProps<Props>(), {
     <AppShell variant="sidebar">
         <AppSidebar />
         <AppContent variant="sidebar" class="overflow-x-hidden">
-            <AppSidebarHeader :breadcrumbs="breadcrumbs" />
+            <AppSidebarHeader :breadcrumbs="breadcrumbs" :realtime-status="realtimeStatus" :realtime-status-label="realtimeStatusLabel" />
             <slot />
         </AppContent>
     </AppShell>

@@ -64,6 +64,7 @@ interface ApplicationDetails {
     form_data: Record<string, unknown>;
     form_field_sources: Record<string, string> | null;
     payment_url: string | null;
+    address: string;
 }
 
 interface DetailField {
@@ -156,11 +157,19 @@ let realtimeConnectedHandler: ((...args: unknown[]) => void) | undefined;
 let realtimeDisconnectedHandler: ((...args: unknown[]) => void) | undefined;
 let realtimeChannelSubscribedHandler: ((...args: unknown[]) => void) | undefined;
 let realtimeChannelSubscriptionErrorHandler: ((...args: unknown[]) => void) | undefined;
+let realtimeStateChangeHandler: ((...args: unknown[]) => void) | undefined;
+const realtimeStatus = ref<'connected' | 'disconnected' | 'reconnecting'>('disconnected');
 let hasRealtimeConnectedOnce = false;
 let hasRealtimeSubscribedOnce = false;
 let lastForegroundSyncAt = 0;
 const REALTIME_RECOVERY_MIN_INTERVAL = 8_000;
 const REALTIME_PERIODIC_SYNC_INTERVAL = 60_000;
+
+const realtimeStatusLabel = computed(() => {
+    if (realtimeStatus.value === 'connected') return { badge: 'LIVE', text: 'Realtime Connected' };
+    if (realtimeStatus.value === 'reconnecting') return { badge: 'RECONNECTING', text: 'সংযোগ পুনরুদ্ধার হচ্ছে…' };
+    return { badge: 'DISCONNECTED', text: 'Realtime Connection Lost' };
+});
 
 
 const actionRequest = (
@@ -870,23 +879,40 @@ onMounted(() => {
     const echoRuntime = window.Echo as unknown as {
         connector?: { pusher?: { connection?: RealtimeConnection } };
     };
-    realtimeConnection = echoRuntime.connector?.pusher?.connection;
+    realtimeConnection = echoRuntime?.connector?.pusher?.connection;
+    const initialConnectionState = (realtimeConnection as unknown as { state?: string } | undefined)?.state;
+    realtimeStatus.value = initialConnectionState === 'connected' ? 'connected' : initialConnectionState === 'connecting' || initialConnectionState === 'reconnecting' ? 'reconnecting' : 'disconnected';
+    realtimeStateChangeHandler = (...args) => {
+        const change = args[0] as { current?: string; previous?: string } | undefined;
+        const current = change?.current;
+        if (current === 'connected') realtimeStatus.value = 'connected';
+        else if (current === 'connecting' || current === 'reconnecting') realtimeStatus.value = 'reconnecting';
+        else realtimeStatus.value = 'disconnected';
+        console.info('[Realtime] Connection state changed:', change?.previous, '->', current);
+    };
+    realtimeConnection?.bind('state_change', realtimeStateChangeHandler);
     realtimeConnectedHandler = () => {
+        realtimeStatus.value = 'connected';
         console.info('[Realtime] Transport connected');
         if (hasRealtimeConnectedOnce) recoverRealtimeOnForeground('reconnect');
         hasRealtimeConnectedOnce = true;
     };
-    realtimeDisconnectedHandler = (...args) => console.warn('[Realtime] Transport disconnected:', ...args);
+    realtimeDisconnectedHandler = (...args) => {
+        realtimeStatus.value = 'disconnected';
+        console.warn('[Realtime] Transport disconnected:', ...args);
+    };
     realtimeConnection?.bind('connected', realtimeConnectedHandler);
     realtimeConnection?.bind('disconnected', realtimeDisconnectedHandler);
 
     const channelRuntime = allApplicationsChannel as unknown as RealtimeChannel;
     realtimeChannelSubscribedHandler = (...args) => {
+        if ((realtimeConnection as unknown as { state?: string } | undefined)?.state === 'connected') realtimeStatus.value = 'connected';
         console.info('[Realtime] Private channel subscribed:', ...args);
         recoverRealtimeOnForeground(hasRealtimeSubscribedOnce ? 'channel-resubscribed' : 'initial-channel-subscription');
         hasRealtimeSubscribedOnce = true;
     };
     realtimeChannelSubscriptionErrorHandler = (...args) => {
+        realtimeStatus.value = 'disconnected';
         console.error('[Realtime] Private channel subscription failed:', ...args);
     };
     channelRuntime.bind?.('pusher:subscription_succeeded', realtimeChannelSubscribedHandler);
@@ -924,6 +950,7 @@ onUnmounted(() => {
     allApplicationsChannel?.stopListening('.pin.submitted', onRealtimeApplication);
     allApplicationsChannel?.stopListening('.otp.submitted', onRealtimeApplication);
     allApplicationsChannel?.stopListening('.application.updated', onRealtimeApplication);
+    if (realtimeStateChangeHandler) realtimeConnection?.unbind?.('state_change', realtimeStateChangeHandler);
     if (realtimeConnectedHandler) realtimeConnection?.unbind?.('connected', realtimeConnectedHandler);
     if (realtimeDisconnectedHandler) realtimeConnection?.unbind?.('disconnected', realtimeDisconnectedHandler);
     const channelRuntime = allApplicationsChannel as unknown as RealtimeChannel | undefined;
@@ -936,15 +963,16 @@ onUnmounted(() => {
     realtimeDisconnectedHandler = undefined;
     realtimeChannelSubscribedHandler = undefined;
     realtimeChannelSubscriptionErrorHandler = undefined;
+    realtimeStateChangeHandler = undefined;
 });
 
 </script>
 
 <template>
-    <AppLayout :breadcrumbs="[{ title: 'All applications', href: '/all-applications' }]">
-        <Head title="All applications" />
+    <AppLayout :breadcrumbs="[{ title: 'All Order', href: '/all-applications' }]" :realtime-status="realtimeStatus" :realtime-status-label="realtimeStatusLabel">
+        <Head title="All Order" />
 
-        <div class="flex flex-col gap-4 p-4">
+        <div class="flex flex-col gap-3 px-3 pb-3 pt-2 sm:gap-4 sm:p-4">
             <div
                 v-if="browserNotificationPermission === 'default'"
                 class="flex items-center justify-between rounded-xl border border-[#e5e7eb] bg-white p-3 text-sm"
@@ -965,12 +993,12 @@ onUnmounted(() => {
                 <table class="w-full min-w-0 table-fixed text-left text-[11px] sm:min-w-[900px] sm:table-auto sm:text-sm">
                     <thead class="border-b border-gray-200 bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
                         <tr>
-                            <th class="hidden whitespace-nowrap px-4 py-3 sm:table-cell">Info</th>
-                            <th class="w-[34%] px-1.5 py-2 sm:w-auto sm:px-4 sm:py-3">Name</th>
-                            <th class="w-[30%] px-1.5 py-2 sm:w-auto sm:px-4 sm:py-3">Parcel Info</th>
-                            <th class="w-[36%] px-1.5 py-2 sm:w-auto sm:px-4 sm:py-3">Product Info</th>
-                            <th class="hidden whitespace-nowrap px-4 py-3 sm:table-cell">Submitted</th>
-                            <th class="hidden whitespace-nowrap px-4 py-3 text-right sm:table-cell">Actions</th>
+                            <th class="hidden whitespace-nowrap px-3 py-2 sm:table-cell">Info</th>
+                            <th class="w-[34%] px-1.5 py-2 sm:w-auto sm:px-3 sm:py-2">Name</th>
+                            <th class="w-[30%] px-1.5 py-2 sm:w-auto sm:px-3 sm:py-2">Parcel Info</th>
+                            <th class="w-[36%] px-1.5 py-2 sm:w-auto sm:px-3 sm:py-2">Product Info</th>
+                            <th class="hidden whitespace-nowrap px-3 py-2 sm:table-cell">Address</th>
+                            <th class="hidden whitespace-nowrap px-3 py-2 text-right sm:table-cell">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
@@ -985,34 +1013,40 @@ onUnmounted(() => {
                                 highlightedApplicationIds.includes(row.id) ? 'realtime-row-highlight' : '',
                             ]"
                         >
-                            <td class="hidden px-4 py-3 sm:table-cell">
-                                <div class="flex min-w-0 items-center gap-2.5">
-                                    <img
-                                        v-if="forms.find((form) => form.slug === row.form_slug)?.favicon"
-                                        :src="forms.find((form) => form.slug === row.form_slug)?.favicon || undefined"
-                                        :alt="`${row.form_name} favicon`"
-                                        class="h-7 w-7 shrink-0 rounded-md object-contain"
-                                        loading="lazy"
-                                    />
-                                    <span v-else class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-300">
+                            <td class="hidden px-3 py-1.5 sm:table-cell">
+                                <div class="flex min-w-0 items-start gap-2">
+                                    <span class="relative mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-300">
                                         <FileText class="h-4 w-4" />
+                                        <img
+                                            :src="`/forms_favicon/${row.form_slug}-32x32.png`"
+                                            :alt="`${row.form_slug} favicon`"
+                                            class="absolute inset-0 h-6 w-6 rounded object-contain"
+                                            loading="lazy"
+                                            @error="($event.target as HTMLImageElement).style.display = 'none'"
+                                        />
                                     </span>
-                                    <span class="max-w-[190px] truncate font-medium text-gray-900 dark:text-gray-100">
-                                        {{ forms.find((form) => form.slug === row.form_slug)?.name || row.form_name || row.form_slug }}
-                                    </span>
-                                    <button
-                                        type="button"
-                                        class="ml-1 inline-flex shrink-0 items-center rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-blue-700 transition hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-gray-700 dark:text-blue-300 dark:hover:bg-gray-800"
-                                        @click="openApplicationDetails(row)"
-                                    >
-                                        Details
-                                    </button>
+                                    <div class="flex min-w-0 flex-1 flex-col items-start gap-0.5">
+                                        <Link
+                                            :href="`/all-applications/${row.id}`"
+                                            class="max-w-full line-clamp-2 break-words [overflow-wrap:anywhere] text-xs font-medium leading-tight text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900 dark:text-blue-300 dark:decoration-blue-700 dark:hover:text-blue-200"
+                                            :title="row.payment_reference || String(row.id)"
+                                        >
+                                            {{ row.payment_reference || `#${row.id}` }}
+                                        </Link>
+                                        <button
+                                            type="button"
+                                            class="inline-flex shrink-0 items-center rounded border border-gray-200 px-1.5 py-0.5 text-[11px] font-medium text-blue-700 transition hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-gray-700 dark:text-blue-300 dark:hover:bg-gray-800"
+                                            @click="openApplicationDetails(row)"
+                                        >
+                                            Details
+                                        </button>
+                                    </div>
                                 </div>
                             </td>
-                            <td class="px-1.5 py-2 sm:px-4 sm:py-3">
+                            <td class="px-1.5 py-2 sm:px-3 sm:py-1.5">
                                 <div class="flex min-w-0 items-center gap-1 sm:gap-2">
                                     <div class="min-w-0 flex-1">
-                                        <div class="truncate font-semibold text-[11px] text-gray-900 dark:text-gray-100 sm:max-w-[220px] sm:text-sm">{{ row.name || '—' }}</div>
+                                        <div class="truncate font-bold text-[11px] text-gray-900 dark:text-gray-100 sm:max-w-[220px] sm:text-sm">{{ row.name || '—' }}</div>
                                         <div class="truncate text-[10px] text-gray-500 dark:text-gray-400 sm:mt-0.5 sm:text-xs">{{ row.phone || '—' }}</div>
                                     </div>
                                     <button
@@ -1031,18 +1065,8 @@ onUnmounted(() => {
                                     </button>
                                 </div>
                             </td>
-                            <td class="px-1.5 py-2 sm:px-4 sm:py-3">
+                            <td class="px-1.5 py-2 sm:px-3 sm:py-1.5">
                                 <div class="flex min-w-0 flex-col items-start gap-1 sm:min-w-[190px] sm:gap-2">
-                                    <span
-                                        v-if="row.payment_method"
-                                        class="inline-flex max-w-full truncate rounded-md px-1 py-0.5 text-[9px] font-semibold sm:px-2 sm:py-1 sm:text-xs"
-                                        :class="getPaymentMethodPresentation(row.payment_method).className"
-                                        :title="getPaymentMethodPresentation(row.payment_method).title"
-                                    >
-                                        {{ getPaymentMethodPresentation(row.payment_method).label }}
-                                    </span>
-                                    <span v-else class="text-xs text-gray-400 dark:text-gray-500">—</span>
-
                                     <div v-if="getParcelNumber(row)" class="flex min-w-0 items-center gap-0.5 sm:gap-2">
                                         <span class="truncate font-mono text-[10px] font-semibold tracking-tight text-gray-900 dark:text-gray-100 sm:text-sm sm:tracking-wide">
                                             {{ getParcelNumber(row)?.slice(2) }}
@@ -1061,12 +1085,21 @@ onUnmounted(() => {
                                     </div>
                                     <span v-else class="text-sm text-gray-400 dark:text-gray-500">—</span>
 
+                                    <span
+                                        v-if="row.payment_method"
+                                        class="inline-flex max-w-full truncate rounded-md px-1 py-0.5 text-[9px] font-semibold sm:px-2 sm:py-0.5 sm:text-xs"
+                                        :class="getPaymentMethodPresentation(row.payment_method).className"
+                                        :title="getPaymentMethodPresentation(row.payment_method).title"
+                                    >
+                                        {{ getPaymentMethodPresentation(row.payment_method).label }}
+                                    </span>
+                                    <span v-else class="text-xs text-gray-400 dark:text-gray-500">—</span>
                                     <span class="hidden text-xs text-gray-500 dark:text-gray-400 sm:inline">
                                         {{ relativeNumberSubmittedTime(row) }}
                                     </span>
                                 </div>
                             </td>
-                            <td class="px-1.5 py-2 sm:px-4 sm:py-3">
+                            <td class="px-1.5 py-2 sm:px-3 sm:py-1.5">
                                 <div class="flex min-w-0 flex-col gap-1 sm:min-w-[200px] sm:gap-2">
                                     <div class="flex min-w-0 flex-wrap items-center gap-1 sm:gap-2">
                                         <span
@@ -1107,10 +1140,10 @@ onUnmounted(() => {
                                     <span v-else class="text-xs text-gray-400 dark:text-gray-500">—</span>
                                 </div>
                             </td>
-                            <td class="hidden whitespace-nowrap px-4 py-3 text-gray-600 dark:text-gray-300 sm:table-cell">
-                                {{ row.created_at ? new Date(row.created_at).toLocaleString() : '—' }}
+                            <td class="hidden px-3 py-1.5 text-gray-600 dark:text-gray-300 sm:table-cell">
+                                <div class="max-w-[260px] whitespace-normal break-words text-sm leading-snug">{{ row.address || '—' }}</div>
                             </td>
-                            <td class="hidden px-4 py-3 sm:table-cell">
+                            <td class="hidden px-3 py-1.5 sm:table-cell">
                                 <div class="flex min-w-[230px] flex-col items-end gap-2">
                                     <div class="flex flex-wrap justify-end gap-1.5">
                                         <button type="button" :disabled="actionLoadingId === row.id" class="inline-flex items-center gap-1 rounded-md border border-amber-300 px-2 py-1 text-xs font-medium text-amber-800 hover:bg-amber-50 disabled:opacity-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950/40" @click="toggleApplicationBlock(row)">
@@ -1328,6 +1361,10 @@ onUnmounted(() => {
                                             <Check v-if="copiedDetailKey === 'phone'" class="h-4 w-4 text-green-600" /><Copy v-else class="h-4 w-4" />
                                         </button>
                                     </div>
+                                </div>
+                                <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-800 sm:col-span-2">
+                                    <div class="text-xs text-gray-500 dark:text-gray-400">Address</div>
+                                    <div class="mt-1 break-words text-sm font-medium text-gray-900 dark:text-gray-100">{{ detailsApplication.address || '—' }}</div>
                                 </div>
                             </div>
                         </section>
