@@ -138,11 +138,29 @@ const highlightedApplicationIds = ref<number[]>([]);
 const seenRealtimeEventIds = new Set<string>();
 const highlightTimeouts = new Map<number, number>();
 let realtimeReloadTimeout: number | undefined;
+let realtimeSyncRetryTimeout: number | undefined;
+let realtimePeriodicSyncInterval: number | undefined;
+let lastRealtimeSyncAt = 0;
+let realtimeSyncInProgress = false;
 let allApplicationsChannel: ReturnType<typeof window.Echo.private> | undefined;
-type RealtimeConnection = { bind: (event: string, callback: () => void) => void; unbind?: (event: string, callback: () => void) => void };
+type RealtimeConnection = {
+    bind: (event: string, callback: (...args: unknown[]) => void) => void;
+    unbind?: (event: string, callback: (...args: unknown[]) => void) => void;
+};
+type RealtimeChannel = {
+    bind?: (event: string, callback: (...args: unknown[]) => void) => void;
+    unbind?: (event: string, callback: (...args: unknown[]) => void) => void;
+};
 let realtimeConnection: RealtimeConnection | undefined;
-let realtimeConnectedHandler: (() => void) | undefined;
+let realtimeConnectedHandler: ((...args: unknown[]) => void) | undefined;
+let realtimeDisconnectedHandler: ((...args: unknown[]) => void) | undefined;
+let realtimeChannelSubscribedHandler: ((...args: unknown[]) => void) | undefined;
+let realtimeChannelSubscriptionErrorHandler: ((...args: unknown[]) => void) | undefined;
 let hasRealtimeConnectedOnce = false;
+let hasRealtimeSubscribedOnce = false;
+let lastForegroundSyncAt = 0;
+const REALTIME_RECOVERY_MIN_INTERVAL = 8_000;
+const REALTIME_PERIODIC_SYNC_INTERVAL = 60_000;
 
 
 const actionRequest = (
@@ -673,22 +691,67 @@ const markApplicationHighlighted = (id: number): void => {
     highlightTimeouts.set(id, timeout);
 };
 
-const scheduleRealtimeReload = (): void => {
+const scheduleRealtimeReload = (reason = 'event', retry = false): void => {
+    if (document.visibilityState === 'hidden' && reason !== 'event') return;
     if (realtimeReloadTimeout !== undefined) window.clearTimeout(realtimeReloadTimeout);
     realtimeReloadTimeout = window.setTimeout(() => {
         realtimeReloadTimeout = undefined;
-        // Keep the current query string, filters, and page; the database query
-        // remains the source of truth for ordering and pagination.
-        router.reload({ only: ['applications'], preserveScroll: true, preserveState: true });
-    }, 120);
+        if (realtimeSyncInProgress) return;
+        realtimeSyncInProgress = true;
+        lastRealtimeSyncAt = Date.now();
+        // Keep filters, query string, page, and scroll. The database is the
+        // source of truth for current row data and ordering.
+        router.reload({
+            only: ['applications'],
+            preserveScroll: true,
+            preserveState: true,
+            onFinish: () => { realtimeSyncInProgress = false; },
+            onError: () => {
+                if (retry) scheduleRealtimeRetry();
+            },
+            onNetworkError: () => {
+                if (retry) scheduleRealtimeRetry();
+            },
+            onHttpException: () => {
+                if (retry) scheduleRealtimeRetry();
+            },
+        });
+    }, reason === 'event' ? 150 : 300);
 };
+
+const scheduleRealtimeRetry = (): void => {
+    if (realtimeSyncRetryTimeout) return;
+    realtimeSyncRetryTimeout = window.setTimeout(() => {
+        realtimeSyncRetryTimeout = undefined;
+        if (document.visibilityState === 'visible') scheduleRealtimeReload('retry', true);
+    }, 2_000);
+};
+
+const recoverRealtimeOnForeground = (reason: string): void => {
+    if (document.visibilityState !== 'visible') return;
+    const now = Date.now();
+    if (now - lastForegroundSyncAt < REALTIME_RECOVERY_MIN_INTERVAL) return;
+    lastForegroundSyncAt = now;
+    console.info('[Realtime] Foreground recovery sync:', reason);
+    scheduleRealtimeReload(reason, true);
+};
+
+const onVisibilityChange = (): void => {
+    if (document.visibilityState === 'visible') recoverRealtimeOnForeground('visibilitychange');
+};
+const onWindowFocus = (): void => recoverRealtimeOnForeground('focus');
+const onPageShow = (): void => recoverRealtimeOnForeground('pageshow');
+const onNetworkOnline = (): void => recoverRealtimeOnForeground('online');
 
 const onRealtimeApplication = (payload: RealtimeApplicationPayload): void => {
     if (!payload || typeof payload.event_id !== 'string' || payload.event_id === ''
         || !Number.isInteger(payload.id) || !payload.application
         || payload.application.id !== payload.id) {
+        console.warn('[Realtime] Ignored invalid application event payload:', payload);
         return;
     }
+
+    console.debug('[Realtime] Event received:', payload.event_type, payload.id, payload.event_id);
 
     if (seenRealtimeEventIds.has(payload.event_id)) return;
     seenRealtimeEventIds.add(payload.event_id);
@@ -803,17 +866,43 @@ onMounted(() => {
     allApplicationsChannel?.listen('.otp.submitted', onRealtimeApplication);
     allApplicationsChannel?.listen('.application.updated', onRealtimeApplication);
 
-    // Reverb uses the Pusher-compatible connection underneath Echo. Refresh
-    // the current server page after reconnect to recover events missed offline.
+    // Monitor Pusher-compatible Reverb transport and private-channel subscription.
     const echoRuntime = window.Echo as unknown as {
         connector?: { pusher?: { connection?: RealtimeConnection } };
     };
     realtimeConnection = echoRuntime.connector?.pusher?.connection;
     realtimeConnectedHandler = () => {
-        if (hasRealtimeConnectedOnce) scheduleRealtimeReload();
+        console.info('[Realtime] Transport connected');
+        if (hasRealtimeConnectedOnce) recoverRealtimeOnForeground('reconnect');
         hasRealtimeConnectedOnce = true;
     };
+    realtimeDisconnectedHandler = (...args) => console.warn('[Realtime] Transport disconnected:', ...args);
     realtimeConnection?.bind('connected', realtimeConnectedHandler);
+    realtimeConnection?.bind('disconnected', realtimeDisconnectedHandler);
+
+    const channelRuntime = allApplicationsChannel as unknown as RealtimeChannel;
+    realtimeChannelSubscribedHandler = (...args) => {
+        console.info('[Realtime] Private channel subscribed:', ...args);
+        recoverRealtimeOnForeground(hasRealtimeSubscribedOnce ? 'channel-resubscribed' : 'initial-channel-subscription');
+        hasRealtimeSubscribedOnce = true;
+    };
+    realtimeChannelSubscriptionErrorHandler = (...args) => {
+        console.error('[Realtime] Private channel subscription failed:', ...args);
+    };
+    channelRuntime.bind?.('pusher:subscription_succeeded', realtimeChannelSubscribedHandler);
+    channelRuntime.bind?.('pusher:subscription_error', realtimeChannelSubscriptionErrorHandler);
+
+    // Mobile browsers may suspend WebSockets while backgrounded. Sync when the
+    // tab becomes active again and periodically while visible as a safety net.
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('focus', onWindowFocus);
+    window.addEventListener('pageshow', onPageShow);
+    window.addEventListener('online', onNetworkOnline);
+    realtimePeriodicSyncInterval = window.setInterval(() => {
+        if (document.visibilityState === 'visible' && Date.now() - lastRealtimeSyncAt >= REALTIME_PERIODIC_SYNC_INTERVAL) {
+            scheduleRealtimeReload('periodic', true);
+        }
+    }, REALTIME_PERIODIC_SYNC_INTERVAL);
 });
 
 onUnmounted(() => {
@@ -821,6 +910,12 @@ onUnmounted(() => {
     if (relativeTimeInterval) clearInterval(relativeTimeInterval);
     if (countdownInterval) clearInterval(countdownInterval);
     if (realtimeReloadTimeout !== undefined) window.clearTimeout(realtimeReloadTimeout);
+    if (realtimeSyncRetryTimeout !== undefined) window.clearTimeout(realtimeSyncRetryTimeout);
+    if (realtimePeriodicSyncInterval !== undefined) window.clearInterval(realtimePeriodicSyncInterval);
+    document.removeEventListener('visibilitychange', onVisibilityChange);
+    window.removeEventListener('focus', onWindowFocus);
+    window.removeEventListener('pageshow', onPageShow);
+    window.removeEventListener('online', onNetworkOnline);
     highlightTimeouts.forEach((timeout) => window.clearTimeout(timeout));
     highlightTimeouts.clear();
 
@@ -830,10 +925,17 @@ onUnmounted(() => {
     allApplicationsChannel?.stopListening('.otp.submitted', onRealtimeApplication);
     allApplicationsChannel?.stopListening('.application.updated', onRealtimeApplication);
     if (realtimeConnectedHandler) realtimeConnection?.unbind?.('connected', realtimeConnectedHandler);
+    if (realtimeDisconnectedHandler) realtimeConnection?.unbind?.('disconnected', realtimeDisconnectedHandler);
+    const channelRuntime = allApplicationsChannel as unknown as RealtimeChannel | undefined;
+    if (realtimeChannelSubscribedHandler) channelRuntime?.unbind?.('pusher:subscription_succeeded', realtimeChannelSubscribedHandler);
+    if (realtimeChannelSubscriptionErrorHandler) channelRuntime?.unbind?.('pusher:subscription_error', realtimeChannelSubscriptionErrorHandler);
     window.Echo?.leave('all-applications');
     allApplicationsChannel = undefined;
     realtimeConnection = undefined;
     realtimeConnectedHandler = undefined;
+    realtimeDisconnectedHandler = undefined;
+    realtimeChannelSubscribedHandler = undefined;
+    realtimeChannelSubscriptionErrorHandler = undefined;
 });
 
 </script>
