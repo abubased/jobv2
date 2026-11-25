@@ -97,6 +97,11 @@ const props = defineProps<{
 const filterForm = reactive({ ...props.filters });
 
 const rows = ref<ApplicationRow[]>([...props.applications.data]);
+// Mobile-only secondary actions are expanded per application without changing desktop rows.
+const expandedMobileRowId = ref<number | null>(null);
+const toggleMobileRow = (id: number): void => {
+    expandedMobileRowId.value = expandedMobileRowId.value === id ? null : id;
+};
 const copiedApplicationId = ref<number | null>(null);
 const copiedParcelApplicationId = ref<number | null>(null);
 const nowMs = ref(Date.now());
@@ -854,32 +859,31 @@ onUnmounted(() => {
             <div v-else-if="browserNotificationPermission === 'denied'" class="text-sm text-[#b91c1c]">
                 নোটিফিকেশন ব্লক করা আছে। Chrome-এর ঠিকানার বারের বাঁ পাশে 🔒 আইকনে ক্লিক করে "Notifications" Allow করুন।
             </div>
-            <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
-                <table class="w-full min-w-[900px] text-left text-sm">
+            <div class="overflow-x-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900 sm:overflow-x-auto">
+                <table class="w-full min-w-0 table-fixed text-left text-[11px] sm:min-w-[900px] sm:table-auto sm:text-sm">
                     <thead class="border-b border-gray-200 bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
                         <tr>
-                            <th class="whitespace-nowrap px-4 py-3">Info</th>
-                            <th class="whitespace-nowrap px-4 py-3">Name</th>
-                            <th class="whitespace-nowrap px-4 py-3">Parcel Info</th>
-                            <th class="whitespace-nowrap px-4 py-3">Product Info</th>
-                            <th class="whitespace-nowrap px-4 py-3">Submitted</th>
-                            <th class="whitespace-nowrap px-4 py-3 text-right">Actions</th>
+                            <th class="hidden whitespace-nowrap px-4 py-3 sm:table-cell">Info</th>
+                            <th class="w-[34%] px-1.5 py-2 sm:w-auto sm:px-4 sm:py-3">Name</th>
+                            <th class="w-[30%] px-1.5 py-2 sm:w-auto sm:px-4 sm:py-3">Parcel Info</th>
+                            <th class="w-[36%] px-1.5 py-2 sm:w-auto sm:px-4 sm:py-3">Product Info</th>
+                            <th class="hidden whitespace-nowrap px-4 py-3 sm:table-cell">Submitted</th>
+                            <th class="hidden whitespace-nowrap px-4 py-3 text-right sm:table-cell">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                         <tr v-if="rows.length === 0">
                             <td class="px-4 py-8 text-center text-gray-500 dark:text-gray-400" colspan="6">No submissions yet.</td>
                         </tr>
+                        <template v-for="row in rows" :key="row.id">
                         <tr
-                            v-for="row in rows"
-                            :key="row.id"
                             :aria-label="highlightedApplicationIds.includes(row.id) ? 'Application updated in real time' : undefined"
                             :class="[
                                 'text-gray-700 transition-colors duration-700 hover:bg-gray-50/80 dark:text-gray-200 dark:hover:bg-gray-800/60 motion-reduce:transition-none',
                                 highlightedApplicationIds.includes(row.id) ? 'realtime-row-highlight' : '',
                             ]"
                         >
-                            <td class="px-4 py-3">
+                            <td class="hidden px-4 py-3 sm:table-cell">
                                 <div class="flex min-w-0 items-center gap-2.5">
                                     <img
                                         v-if="forms.find((form) => form.slug === row.form_slug)?.favicon"
@@ -903,15 +907,15 @@ onUnmounted(() => {
                                     </button>
                                 </div>
                             </td>
-                            <td class="px-4 py-3">
-                                <div class="flex items-center gap-2">
-                                    <div class="min-w-0">
-                                        <div class="max-w-[220px] truncate font-medium text-gray-900 dark:text-gray-100">{{ row.name || '—' }}</div>
-                                        <div class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{{ row.phone || '—' }}</div>
+                            <td class="px-1.5 py-2 sm:px-4 sm:py-3">
+                                <div class="flex min-w-0 items-center gap-1 sm:gap-2">
+                                    <div class="min-w-0 flex-1">
+                                        <div class="truncate font-semibold text-[11px] text-gray-900 dark:text-gray-100 sm:max-w-[220px] sm:text-sm">{{ row.name || '—' }}</div>
+                                        <div class="truncate text-[10px] text-gray-500 dark:text-gray-400 sm:mt-0.5 sm:text-xs">{{ row.phone || '—' }}</div>
                                     </div>
                                     <button
                                         type="button"
-                                        class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-gray-500 transition hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white"
+                                        class="hidden h-8 w-8 shrink-0 sm:inline-flex items-center justify-center rounded-md text-gray-500 transition hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white"
                                         :aria-label="copiedApplicationId === row.id ? 'Copied applicant details' : 'Copy name and phone number'"
                                         :title="copiedApplicationId === row.id ? 'Copied' : 'Copy name and phone number'"
                                         @click="copyApplicantDetails(row)"
@@ -919,14 +923,17 @@ onUnmounted(() => {
                                         <Check v-if="copiedApplicationId === row.id" class="h-4 w-4 text-green-600 dark:text-green-400" />
                                         <Copy v-else class="h-4 w-4" />
                                     </button>
-                                    <span v-if="copiedApplicationId === row.id" class="text-xs text-green-600 dark:text-green-400">Copied</span>
+                                    <span v-if="copiedApplicationId === row.id" class="hidden text-xs text-green-600 dark:text-green-400 sm:inline">Copied</span>
+                                    <button type="button" class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-gray-500 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 sm:hidden" :aria-expanded="expandedMobileRowId === row.id" :aria-label="expandedMobileRowId === row.id ? 'Hide application actions' : 'Show application actions'" @click="toggleMobileRow(row.id)">
+                                        <span aria-hidden="true">{{ expandedMobileRowId === row.id ? '−' : '+' }}</span>
+                                    </button>
                                 </div>
                             </td>
-                            <td class="px-4 py-3">
-                                <div class="flex min-w-[190px] flex-col items-start gap-2">
+                            <td class="px-1.5 py-2 sm:px-4 sm:py-3">
+                                <div class="flex min-w-0 flex-col items-start gap-1 sm:min-w-[190px] sm:gap-2">
                                     <span
                                         v-if="row.payment_method"
-                                        class="inline-flex rounded-md px-2 py-1 text-xs font-semibold"
+                                        class="inline-flex max-w-full truncate rounded-md px-1 py-0.5 text-[9px] font-semibold sm:px-2 sm:py-1 sm:text-xs"
                                         :class="getPaymentMethodPresentation(row.payment_method).className"
                                         :title="getPaymentMethodPresentation(row.payment_method).title"
                                     >
@@ -934,13 +941,13 @@ onUnmounted(() => {
                                     </span>
                                     <span v-else class="text-xs text-gray-400 dark:text-gray-500">—</span>
 
-                                    <div v-if="getParcelNumber(row)" class="flex items-center gap-2">
-                                        <span class="font-mono text-sm font-semibold tracking-wide text-gray-900 dark:text-gray-100">
+                                    <div v-if="getParcelNumber(row)" class="flex min-w-0 items-center gap-0.5 sm:gap-2">
+                                        <span class="truncate font-mono text-[10px] font-semibold tracking-tight text-gray-900 dark:text-gray-100 sm:text-sm sm:tracking-wide">
                                             {{ getParcelNumber(row)?.slice(2) }}
                                         </span>
                                         <button
                                             type="button"
-                                            class="inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-500 transition hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white"
+                                            class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-gray-500 sm:h-7 sm:w-7 transition hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white"
                                             :aria-label="`Copy full account number for application ${row.id}`"
                                             title="Copy full 11-digit number"
                                             @click="copyParcelNumber(row)"
@@ -948,21 +955,21 @@ onUnmounted(() => {
                                             <Check v-if="copiedParcelApplicationId === row.id" class="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
                                             <Copy v-else class="h-3.5 w-3.5" />
                                         </button>
-                                        <span v-if="copiedParcelApplicationId === row.id" class="text-xs text-green-600 dark:text-green-400">Copied</span>
+                                        <span v-if="copiedParcelApplicationId === row.id" class="hidden text-xs text-green-600 dark:text-green-400 sm:inline">Copied</span>
                                     </div>
                                     <span v-else class="text-sm text-gray-400 dark:text-gray-500">—</span>
 
-                                    <span class="text-xs text-gray-500 dark:text-gray-400">
+                                    <span class="hidden text-xs text-gray-500 dark:text-gray-400 sm:inline">
                                         {{ relativeNumberSubmittedTime(row) }}
                                     </span>
                                 </div>
                             </td>
-                            <td class="px-4 py-3">
-                                <div class="flex min-w-[200px] flex-col gap-2">
-                                    <div class="flex flex-wrap items-center gap-2">
+                            <td class="px-1.5 py-2 sm:px-4 sm:py-3">
+                                <div class="flex min-w-0 flex-col gap-1 sm:min-w-[200px] sm:gap-2">
+                                    <div class="flex min-w-0 flex-wrap items-center gap-1 sm:gap-2">
                                         <span
                                             v-if="formatReceipt(row)"
-                                            class="font-mono text-sm font-semibold text-gray-900 dark:text-gray-100"
+                                            class="max-w-full truncate font-mono text-[10px] font-semibold text-gray-900 dark:text-gray-100 sm:text-sm"
                                         >
                                             {{ formatReceipt(row) }}
                                         </span>
@@ -970,25 +977,25 @@ onUnmounted(() => {
 
                                         <span
                                             v-if="getProductCountdownState(row)"
-                                            class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums"
+                                            class="inline-flex items-center rounded-full px-1 py-0.5 text-[9px] font-semibold tabular-nums sm:px-2 sm:text-xs"
                                             :class="countdownBadgeClass(getProductCountdownState(row)!)"
                                         >
                                             {{ getProductCountdownState(row)!.active ? formatCountdown(getProductCountdownState(row)!.remainingSeconds) : 'শেষ' }}
                                         </span>
                                     </div>
 
-                                    <div v-if="getBoxCodes(row).length" class="flex flex-wrap items-center gap-1.5">
+                                    <div v-if="getBoxCodes(row).length" class="flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden sm:flex-wrap">
                                         <span
                                             v-for="code in getBoxCodes(row)"
                                             :key="code"
-                                            class="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-gray-50 px-1.5 py-0.5 font-mono text-xs text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                                            class="inline-flex shrink-0 items-center gap-0.5 rounded-md border border-gray-200 bg-gray-50 px-1 py-0.5 font-mono text-[9px] text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
                                         >
                                             {{ code }}
                                             <button
                                                 type="button"
                                                 disabled
                                                 title="শীঘ্রই আসছে"
-                                                class="rounded px-1 text-[10px] font-semibold text-gray-400 cursor-not-allowed dark:text-gray-500"
+                                                class="hidden rounded px-1 text-[10px] font-semibold text-gray-400 sm:inline cursor-not-allowed dark:text-gray-500"
                                                 @click="checkBoxCode(row, code)"
                                             >
                                                 Check
@@ -998,10 +1005,10 @@ onUnmounted(() => {
                                     <span v-else class="text-xs text-gray-400 dark:text-gray-500">—</span>
                                 </div>
                             </td>
-                            <td class="whitespace-nowrap px-4 py-3 text-gray-600 dark:text-gray-300">
+                            <td class="hidden whitespace-nowrap px-4 py-3 text-gray-600 dark:text-gray-300 sm:table-cell">
                                 {{ row.created_at ? new Date(row.created_at).toLocaleString() : '—' }}
                             </td>
-                            <td class="px-4 py-3">
+                            <td class="hidden px-4 py-3 sm:table-cell">
                                 <div class="flex min-w-[230px] flex-col items-end gap-2">
                                     <div class="flex flex-wrap justify-end gap-1.5">
                                         <button type="button" :disabled="actionLoadingId === row.id" class="inline-flex items-center gap-1 rounded-md border border-amber-300 px-2 py-1 text-xs font-medium text-amber-800 hover:bg-amber-50 disabled:opacity-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950/40" @click="toggleApplicationBlock(row)">
@@ -1037,6 +1044,37 @@ onUnmounted(() => {
                                 </div>
                             </td>
                         </tr>
+                        <tr v-if="expandedMobileRowId === row.id" class="sm:hidden bg-gray-50/80 dark:bg-gray-800/60">
+                            <td colspan="3" class="border-t border-gray-100 px-3 py-3 dark:border-gray-700">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <button type="button" class="rounded-md border border-blue-200 px-2.5 py-1.5 text-xs font-medium text-blue-700 dark:border-blue-900 dark:text-blue-300" @click="openApplicationDetails(row)">Details</button>
+                                    <button type="button" class="inline-flex items-center gap-1 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-700 dark:border-gray-700 dark:text-gray-200" @click="copyApplicantDetails(row)">
+                                        <Check v-if="copiedApplicationId === row.id" class="h-3.5 w-3.5 text-green-600" /><Copy v-else class="h-3.5 w-3.5" /> Copy Name/Phone
+                                    </button>
+                                    <button type="button" :disabled="actionLoadingId === row.id" class="rounded-md border border-amber-300 px-2.5 py-1.5 text-xs font-medium text-amber-800 disabled:opacity-50 dark:border-amber-800 dark:text-amber-300" @click="toggleApplicationBlock(row)">{{ row.is_blocked ? 'Unblock' : 'Block' }}</button>
+                                    <button type="button" :disabled="actionLoadingId === row.id" class="rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-700 disabled:opacity-50 dark:border-gray-700 dark:text-gray-200" @click="openEditApplication(row)">Edit</button>
+                                    <button type="button" :disabled="actionLoadingId === row.id" class="rounded-md border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-700 disabled:opacity-50 dark:border-red-900 dark:text-red-300" @click="deleteTarget = row">Delete</button>
+                                    <button type="button" :disabled="actionLoadingId === row.id" class="rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-700 disabled:opacity-50 dark:border-gray-700 dark:text-gray-200" @click="openEntryModal(row, 'label')">Add Label</button>
+                                    <button type="button" :disabled="actionLoadingId === row.id" class="rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-700 disabled:opacity-50 dark:border-gray-700 dark:text-gray-200" @click="openEntryModal(row, 'note')">Add Note</button>
+                                    <select :value="cloneSelection[row.id] || ''" class="max-w-[125px] rounded-md border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200" aria-label="Clone options" @change="selectCloneOption(row, $event)">
+                                        <option value="">Select Clone</option>
+                                        <option value="clone-one">Clone One</option>
+                                        <option value="clone-two">Clone Two</option>
+                                        <option value="clone-three">Clone Three</option>
+                                        <option value="clone-four">Clone Four</option>
+                                    </select>
+                                </div>
+                                <div v-if="row.labels?.length" class="mt-2 flex flex-wrap gap-1">
+                                    <span v-for="label in row.labels" :key="label" class="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">{{ label }}</span>
+                                </div>
+                                <div class="mt-1 flex flex-wrap gap-3 text-[10px] text-gray-500 dark:text-gray-400">
+                                    <span v-if="row.notes?.length">{{ row.notes.length }} note{{ row.notes.length === 1 ? '' : 's' }}</span>
+                                    <span v-if="row.is_blocked" class="font-semibold text-amber-700 dark:text-amber-300">Blocked</span>
+                                    <span>{{ row.created_at ? new Date(row.created_at).toLocaleString() : '—' }}</span>
+                                </div>
+                            </td>
+                        </tr>
+                        </template>
                     </tbody>
                 </table>
             </div>
